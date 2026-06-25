@@ -107,7 +107,6 @@ export default {
         "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
         "fade-in": { from: { opacity: "0", transform: "translateY(4px)" }, to: { opacity: "1", transform: "translateY(0)" } },
         "slide-up": { from: { transform: "translateY(100%)" }, to: { transform: "translateY(0)" } },
-        pulse-soft: undefined as never,
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
