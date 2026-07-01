@@ -1,8 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, SectionTitle } from "@/components/common/Card";
-import { timeline } from "@/services/mock/data";
 import { timeKR } from "@/lib/format";
 import { CheckCircle2, Send, Zap, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { queryKeys, timelineAdapter } from "@/services/adapters";
 
 const META = {
   signal: { icon: Zap, tone: "text-accent", bg: "bg-accent/10", label: "신호" },
@@ -12,9 +13,14 @@ const META = {
 } as const;
 
 export function TimelineCard() {
+  const { data: timeline = [], isLoading } = useQuery({
+    queryKey: queryKeys.timeline,
+    queryFn: timelineAdapter.recent,
+  });
+
   return (
     <Card>
-      <SectionTitle title="오늘의 타임라인" sub="신호 → 주문 → 체결 → 리스크" />
+      <SectionTitle title="오늘의 타임라인" sub={isLoading ? "이벤트 조회 중" : "신호 → 주문 → 체결 → 리스크"} />
       <ol className="relative space-y-3 pl-1">
         {timeline.map((e, i) => {
           const m = META[e.kind];
