@@ -1,12 +1,32 @@
+import { useQuery } from "@tanstack/react-query";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { Card } from "@/components/common/Card";
 import { DeltaPct } from "@/components/common/DeltaPct";
 import { won, wonCompact } from "@/lib/format";
-import { portfolio } from "@/services/mock/data";
+import { getErrorMessage } from "@/services/apiClient";
+import { portfolioAdapter, queryKeys } from "@/services/adapters";
+import type { Portfolio } from "@/types";
+
+const emptyPortfolio: Portfolio & { updatedAt?: string } = {
+  equity: 0,
+  cash: 0,
+  dayPnl: 0,
+  dayPnlPct: 0,
+  cumulativePnl: 0,
+  cashRatio: 0,
+  intradayCurve: [],
+};
 
 export function PortfolioCard() {
-  const p = portfolio;
+  const query = useQuery({
+    queryKey: queryKeys.portfolio,
+    queryFn: () => portfolioAdapter.getPortfolio(),
+    refetchInterval: 15_000,
+    retry: 1,
+  });
+  const p = query.data ?? emptyPortfolio;
   const up = p.dayPnl >= 0;
+
   return (
     <Card className="overflow-hidden p-0">
       <div className="space-y-4 p-4">
@@ -14,8 +34,15 @@ export function PortfolioCard() {
           <div>
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">평가자산</div>
             <div className="mt-1 text-[26px] font-bold leading-none num">
-              {p.equity.toLocaleString("ko-KR")}
-              <span className="ml-1 text-base font-medium text-muted-foreground">원</span>
+              {query.isLoading ? "조회 중" : p.equity.toLocaleString("ko-KR")}
+              {!query.isLoading && <span className="ml-1 text-base font-medium text-muted-foreground">원</span>}
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {query.isError
+                ? `API 오류 · ${getErrorMessage(query.error)}`
+                : p.updatedAt
+                  ? `마지막 조회 · ${new Date(p.updatedAt).toLocaleTimeString("ko-KR")}`
+                  : "FastAPI 계좌 API 대기 중"}
             </div>
           </div>
           <div className="text-right">
