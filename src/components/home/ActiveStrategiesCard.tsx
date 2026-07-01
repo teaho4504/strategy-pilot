@@ -1,11 +1,16 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, SectionTitle } from "@/components/common/Card";
 import { StatusBadge } from "@/components/common/DemoBadge";
 import { DeltaPct } from "@/components/common/DeltaPct";
-import { strategies } from "@/services/mock/data";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+import { queryKeys, strategyAdapter } from "@/services/adapters";
 
 export function ActiveStrategiesCard() {
+  const { data: strategies = [], isLoading } = useQuery({
+    queryKey: queryKeys.strategies,
+    queryFn: strategyAdapter.list,
+  });
   const running = strategies.filter((s) => s.status === "running").length;
   const totalSignals = strategies.reduce((a, b) => a + b.signalsToday, 0);
   const totalFills = strategies.reduce((a, b) => a + b.fillsToday, 0);
@@ -14,6 +19,7 @@ export function ActiveStrategiesCard() {
     <Card>
       <SectionTitle
         title="활성 전략"
+        sub={isLoading ? "전략 데이터 조회 중" : undefined}
         action={
           <Link to="/strategies" className="flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground">
             전체보기 <ChevronRight className="h-3.5 w-3.5" />
