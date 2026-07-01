@@ -8,7 +8,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { strategies } from "@/services/mock/data";
 
 const automationLabel = { idle: "대기", running: "실행 중", paused: "일시정지" } as const;
 
@@ -28,7 +27,6 @@ export function AutomationControl() {
 
   const killAll = () => {
     setAutomation("paused");
-    strategies.forEach((s) => { if (s.status === "running") s.status = "paused"; });
     toast.error("Kill Switch · 모든 전략이 즉시 중지되었습니다 (데모)");
     setKillStep(0);
   };
@@ -66,7 +64,6 @@ export function AutomationControl() {
         <Power className="h-5 w-5 text-danger/70 group-hover:text-danger" />
       </button>
 
-      {/* Toggle confirm */}
       <AlertDialog open={confirmToggle !== null} onOpenChange={(o) => !o && setConfirmToggle(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -86,7 +83,6 @@ export function AutomationControl() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Kill switch — 2-step */}
       <AlertDialog open={killStep > 0} onOpenChange={(o) => !o && setKillStep(0)}>
         <AlertDialogContent>
           <AlertDialogHeader>
