@@ -1,6 +1,13 @@
 from functools import lru_cache
 import os
+from pathlib import Path
 from typing import Literal
+
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv()
 
 KiwoomMode = Literal["mock", "live"]
 
