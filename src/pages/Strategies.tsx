@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Pause, Play, ChevronRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/common/Card";
 import { StatusBadge } from "@/components/common/DemoBadge";
 import { DeltaPct } from "@/components/common/DeltaPct";
-import { strategies as initial } from "@/services/mock/data";
+import { queryKeys, strategyAdapter, useStrategiesQuery } from "@/services/adapters";
 import { won, relTime } from "@/lib/format";
-import type { Strategy, StrategyStatus } from "@/types";
+import type { StrategyStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,8 @@ const TABS: { key: "all" | StrategyStatus; label: string }[] = [
 ];
 
 export default function Strategies() {
-  const [list, setList] = useState<Strategy[]>(initial);
+  const queryClient = useQueryClient();
+  const { data: list = [], isLoading, isError } = useStrategiesQuery();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("all");
 
   const filtered = useMemo(
@@ -29,15 +31,19 @@ export default function Strategies() {
     [list, tab]
   );
 
-  const toggle = (id: string) => {
-    setList((prev) =>
-      prev.map((s) => {
-        if (s.id !== id) return s;
-        if (s.status === "running") { toast.message(`${s.name} 일시정지 (데모)`); return { ...s, status: "paused" }; }
-        if (s.status === "paused" || s.status === "idle") { toast.success(`${s.name} 시작 (데모)`); return { ...s, status: "running" }; }
-        toast.error(`${s.name}: 오류 상태입니다. 설정에서 점검 필요`); return s;
-      })
-    );
+  const toggle = async (id: string) => {
+    const current = list.find((s) => s.id === id);
+    if (!current) return;
+
+    if (current.status === "error") {
+      toast.error(`${current.name}: 오류 상태입니다. 설정에서 점검 필요`);
+      return;
+    }
+
+    const next = current.status === "running" ? "paused" : "running";
+    await strategyAdapter.toggle(id, next);
+    queryClient.invalidateQueries({ queryKey: queryKeys.strategies });
+    toast[next === "running" ? "success" : "message"](`${current.name} ${next === "running" ? "시작" : "일시정지"} (데모)`);
   };
 
   return (
@@ -77,7 +83,13 @@ export default function Strategies() {
         </div>
 
         <div className="space-y-3">
-          {filtered.length === 0 && (
+          {isLoading && (
+            <Card className="text-center text-sm text-muted-foreground">전략 데이터를 불러오는 중입니다.</Card>
+          )}
+          {isError && (
+            <Card className="text-center text-sm text-danger">전략 데이터를 불러오지 못했습니다.</Card>
+          )}
+          {!isLoading && !isError && filtered.length === 0 && (
             <Card className="text-center text-sm text-muted-foreground">조건에 해당하는 전략이 없습니다.</Card>
           )}
           {filtered.map((s) => (
