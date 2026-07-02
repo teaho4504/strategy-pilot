@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/common/Card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { orders as initial } from "@/services/mock/data";
+import { orderAdapter, queryKeys, useOrdersQuery } from "@/services/adapters";
 import type { Order, OrderStatus } from "@/types";
 import { timeKR, won } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,8 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 };
 
 export default function Orders() {
-  const [list, setList] = useState<Order[]>(initial);
+  const queryClient = useQueryClient();
+  const { data: list = [], isLoading, isError } = useOrdersQuery();
   const [tab, setTab] = useState<Tab>("pending");
   const [sel, setSel] = useState<Order | null>(null);
 
@@ -33,8 +35,9 @@ export default function Orders() {
     [list, tabSpec]
   );
 
-  const cancel = (id: string) => {
-    setList((prev) => prev.map((o) => (o.id === id && o.status === "pending" ? { ...o, status: "cancelled" } : o)));
+  const cancel = async (id: string) => {
+    await orderAdapter.cancel(id);
+    queryClient.invalidateQueries({ queryKey: queryKeys.orders });
     toast.success("주문 취소 (데모)");
     setSel(null);
   };
@@ -69,7 +72,9 @@ export default function Orders() {
         </div>
 
         <div className="space-y-2">
-          {filtered.length === 0 && (
+          {isLoading && <Card className="text-center text-sm text-muted-foreground">주문 데이터를 불러오는 중입니다.</Card>}
+          {isError && <Card className="text-center text-sm text-danger">주문 데이터를 불러오지 못했습니다.</Card>}
+          {!isLoading && !isError && filtered.length === 0 && (
             <Card className="text-center text-sm text-muted-foreground">표시할 주문이 없습니다.</Card>
           )}
           {filtered.map((o) => (
