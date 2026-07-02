@@ -13,6 +13,18 @@ npm run dev
 
 Vite 개발 서버는 `/api` 요청을 `http://localhost:8000`으로 프록시합니다.
 
+모바일 또는 클라우드 배포에서는 `.env`에 API 서버 주소를 지정합니다.
+
+```bash
+cp .env.example .env
+# 같은 Wi-Fi 모바일 테스트 예시
+VITE_API_BASE_URL=http://192.168.0.10:8000
+# 클라우드 배포 예시
+VITE_API_BASE_URL=https://api.your-domain.com
+```
+
+`VITE_API_BASE_URL`이 비어 있으면 기존 로컬 proxy(`/api`)를 사용합니다. 프론트엔드 `.env`에는 키움 App Key, Secret, Access Token, 계좌번호를 절대 넣지 않습니다.
+
 ### Backend
 
 ```bash
@@ -24,6 +36,16 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
+모바일 기기에서 같은 Wi-Fi로 로컬 백엔드에 접근하려면 백엔드를 외부 인터페이스에 바인딩합니다.
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+그 다음 Mac 또는 서버의 LAN IP를 프론트 `.env`의 `VITE_API_BASE_URL`에 넣습니다. 예: `http://192.168.0.10:8000`.
+
+클라우드 모바일 접속은 FastAPI 백엔드를 AWS Lightsail/EC2 같은 서버에 배포하고, 프론트는 Vercel/Amplify에서 `VITE_API_BASE_URL=https://api.your-domain.com`으로 빌드합니다. 이 방식이면 Mac을 꺼도 모바일에서 접속할 수 있습니다.
+
 ## 백엔드 환경변수 예시
 
 ```bash
@@ -33,7 +55,7 @@ KIWOOM_APP_KEY=
 KIWOOM_APP_SECRET=
 KIWOOM_ACCESS_TOKEN=
 KIWOOM_ACCOUNT_NO=
-CORS_ORIGINS=http://localhost:8080,http://localhost:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:8080,http://localhost:5173,http://localhost:3000,http://192.168.0.10:8080,https://your-frontend-domain.com
 ```
 
 민감정보는 `backend/.env`에서만 관리합니다. `VITE_*` 환경변수에 키움 App Key, Secret, Access Token, 계좌번호를 넣지 않습니다. `.env`는 Git에 포함하지 않습니다.
@@ -93,6 +115,7 @@ src/
 - `backend/requirements.txt`
 - `backend/.env.example`
 - `backend/README.md`
+- `.env.example`
 - `src/services/apiClient.ts`
 - `src/services/adapters.ts`
 - `src/components/home/PortfolioCard.tsx`
