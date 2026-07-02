@@ -1,5 +1,5 @@
 import { Card, SectionTitle } from "@/components/common/Card";
-import { timeline } from "@/services/mock/data";
+import { useTimelineQuery } from "@/services/adapters";
 import { timeKR } from "@/lib/format";
 import { CheckCircle2, Send, Zap, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,35 +12,43 @@ const META = {
 } as const;
 
 export function TimelineCard() {
+  const { data: timeline = [], isLoading, isError } = useTimelineQuery();
+
   return (
     <Card>
       <SectionTitle title="오늘의 타임라인" sub="신호 → 주문 → 체결 → 리스크" />
-      <ol className="relative space-y-3 pl-1">
-        {timeline.map((e, i) => {
-          const m = META[e.kind];
-          const Icon = m.icon;
-          return (
-            <li key={e.id} className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <span className={cn("grid h-8 w-8 place-items-center rounded-full", m.bg, m.tone)}>
-                  <Icon className="h-4 w-4" />
-                </span>
-                {i < timeline.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
-              </div>
-              <div className="flex-1 pb-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-foreground">{e.title}</span>
-                  <span className="text-[11px] text-muted-foreground num">{timeKR(e.time)}</span>
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground">타임라인 조회 중...</div>
+      ) : isError ? (
+        <div className="text-sm text-danger">타임라인 데이터를 불러오지 못했습니다.</div>
+      ) : (
+        <ol className="relative space-y-3 pl-1">
+          {timeline.map((e, i) => {
+            const m = META[e.kind];
+            const Icon = m.icon;
+            return (
+              <li key={e.id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span className={cn("grid h-8 w-8 place-items-center rounded-full", m.bg, m.tone)}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  {i < timeline.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
                 </div>
-                <div className="text-[12px] text-muted-foreground">
-                  {e.detail}
-                  {e.strategyName && <span className="ml-1 text-muted-foreground/70">· {e.strategyName}</span>}
+                <div className="flex-1 pb-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-foreground">{e.title}</span>
+                    <span className="text-[11px] text-muted-foreground num">{timeKR(e.time)}</span>
+                  </div>
+                  <div className="text-[12px] text-muted-foreground">
+                    {e.detail}
+                    {e.strategyName && <span className="ml-1 text-muted-foreground/70">· {e.strategyName}</span>}
+                  </div>
                 </div>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </Card>
   );
 }
