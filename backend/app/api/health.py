@@ -18,6 +18,8 @@ async def health() -> HealthStatus:
         mode=settings.kiwoom_mode,
         kiwoomConfigured=settings.kiwoom_configured,
         kiwoomMissing=settings.missing_kiwoom_env,
+        readOnly=settings.kiwoom_read_only,
+        orderEnabled=settings.order_enabled,
         lastUpdatedAt=success_at,
         lastError=error,
         connection=ConnectionStatus(
