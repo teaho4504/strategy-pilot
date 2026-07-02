@@ -43,7 +43,11 @@ export default function Strategies() {
     const next = current.status === "running" ? "paused" : "running";
     await strategyAdapter.toggle(id, next);
     queryClient.invalidateQueries({ queryKey: queryKeys.strategies });
-    toast[next === "running" ? "success" : "message"](`${current.name} ${next === "running" ? "시작" : "일시정지"} (데모)`);
+    if (next === "running") {
+      toast.success(`${current.name} 시작 (데모)`);
+    } else {
+      toast.message(`${current.name} 일시정지 (데모)`);
+    }
   };
 
   return (
