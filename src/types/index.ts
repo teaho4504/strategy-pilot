@@ -1,5 +1,6 @@
-// Domain types for AutoTrader KR demo dashboard.
-// NOTE: All values powered by mock adapters. No real brokerage integration.
+// Domain types for AutoTrader KR dashboard.
+// Account and market data are loaded through FastAPI adapters. No brokerage
+// secrets or order execution logic belongs in the frontend.
 
 export type AutomationState = "idle" | "running" | "paused" | "error";
 
@@ -7,7 +8,7 @@ export interface Account {
   id: string;
   broker: string;        // e.g. "키움증권"
   label: string;         // e.g. "데모계좌"
-  isDemo: true;          // demo-only in this prototype
+  isDemo: boolean;
   maskedNumber: string;  // e.g. "****-**-1234"
 }
 
@@ -22,7 +23,7 @@ export interface Portfolio {
 }
 
 export interface MarketIndex {
-  code: "KOSPI" | "KOSDAQ" | "USDKRW";
+  code: string;
   name: string;
   value: number;
   changePct: number;
