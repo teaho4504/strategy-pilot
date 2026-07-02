@@ -1,17 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card, SectionTitle } from "@/components/common/Card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { riskSettings as initial } from "@/services/mock/data";
+import { queryKeys, riskAdapter, useBackendHealthQuery, useRiskSettingsQuery } from "@/services/adapters";
 import { won } from "@/lib/format";
 import { Link2, ShieldCheck, ServerCog, Lock, Info } from "lucide-react";
 import { toast } from "sonner";
+import type { RiskSettings } from "@/types";
 
 export default function Settings() {
-  const [r, setR] = useState(initial);
+  const queryClient = useQueryClient();
+  const { data: initial, isLoading: riskLoading, isError: riskError } = useRiskSettingsQuery();
+  const { data: health } = useBackendHealthQuery();
+  const [r, setR] = useState<RiskSettings | null>(null);
+
+  useEffect(() => {
+    if (initial) setR(initial);
+  }, [initial]);
+
+  const save = async () => {
+    if (!r) return;
+    await riskAdapter.update(r);
+    queryClient.invalidateQueries({ queryKey: queryKeys.risk });
+    toast.success("설정 저장됨 (데모)");
+  };
 
   return (
     <>
@@ -21,33 +38,41 @@ export default function Settings() {
 
         <Card className="space-y-4">
           <SectionTitle title="리스크 한도" sub="자동매매가 절대 넘지 않는 안전 한도" />
-          <Field label="일일 손실 한도" suffix="원" value={r.dailyLossLimit}
-            onChange={(v) => setR({ ...r, dailyLossLimit: v })} hint="이 금액 도달 시 모든 전략 자동 정지" />
-          <Field label="전략별 최대 투자금" suffix="원" value={r.perStrategyMaxInvest}
-            onChange={(v) => setR({ ...r, perStrategyMaxInvest: v })} />
-          <Field label="종목당 최대 비중" suffix="%" value={r.perTickerMaxWeightPct}
-            onChange={(v) => setR({ ...r, perTickerMaxWeightPct: v })} />
-          <Field label="동시 보유 종목 수" suffix="개" value={r.maxConcurrentTickers}
-            onChange={(v) => setR({ ...r, maxConcurrentTickers: v })} />
-          <Field label="일일 주문 횟수 제한" suffix="건" value={r.maxOrdersPerDay}
-            onChange={(v) => setR({ ...r, maxOrdersPerDay: v })} />
-          <div className="rounded-xl border border-success/30 bg-success/10 p-3 text-[12px] text-success flex gap-2">
-            <ShieldCheck className="h-4 w-4 shrink-0" />
-            현재 한도 요약 · 일일 손실 {won(r.dailyLossLimit)} · 종목당 {r.perTickerMaxWeightPct}% 이하
-          </div>
+          {riskLoading && <div className="text-sm text-muted-foreground">리스크 설정 조회 중...</div>}
+          {riskError && <div className="text-sm text-danger">리스크 설정을 불러오지 못했습니다.</div>}
+          {r && (
+            <>
+              <Field label="일일 손실 한도" suffix="원" value={r.dailyLossLimit}
+                onChange={(v) => setR({ ...r, dailyLossLimit: v })} hint="이 금액 도달 시 모든 전략 자동 정지" />
+              <Field label="전략별 최대 투자금" suffix="원" value={r.perStrategyMaxInvest}
+                onChange={(v) => setR({ ...r, perStrategyMaxInvest: v })} />
+              <Field label="종목당 최대 비중" suffix="%" value={r.perTickerMaxWeightPct}
+                onChange={(v) => setR({ ...r, perTickerMaxWeightPct: v })} />
+              <Field label="동시 보유 종목 수" suffix="개" value={r.maxConcurrentTickers}
+                onChange={(v) => setR({ ...r, maxConcurrentTickers: v })} />
+              <Field label="일일 주문 횟수 제한" suffix="건" value={r.maxOrdersPerDay}
+                onChange={(v) => setR({ ...r, maxOrdersPerDay: v })} />
+              <div className="rounded-xl border border-success/30 bg-success/10 p-3 text-[12px] text-success flex gap-2">
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                현재 한도 요약 · 일일 손실 {won(r.dailyLossLimit)} · 종목당 {r.perTickerMaxWeightPct}% 이하
+              </div>
+            </>
+          )}
         </Card>
 
-        <Card className="space-y-3">
-          <SectionTitle title="알림" />
-          <Toggle label="전략 오류" checked={r.notify.strategyError}
-            onChange={(v) => setR({ ...r, notify: { ...r.notify, strategyError: v } })} />
-          <Toggle label="주문 실패" checked={r.notify.orderFailure}
-            onChange={(v) => setR({ ...r, notify: { ...r.notify, orderFailure: v } })} />
-          <Toggle label="일일 손실 한도 도달" checked={r.notify.dailyLossHit}
-            onChange={(v) => setR({ ...r, notify: { ...r.notify, dailyLossHit: v } })} />
-          <Toggle label="큰 수익/손실 발생" checked={r.notify.bigPnl}
-            onChange={(v) => setR({ ...r, notify: { ...r.notify, bigPnl: v } })} />
-        </Card>
+        {r && (
+          <Card className="space-y-3">
+            <SectionTitle title="알림" />
+            <Toggle label="전략 오류" checked={r.notify.strategyError}
+              onChange={(v) => setR({ ...r, notify: { ...r.notify, strategyError: v } })} />
+            <Toggle label="주문 실패" checked={r.notify.orderFailure}
+              onChange={(v) => setR({ ...r, notify: { ...r.notify, orderFailure: v } })} />
+            <Toggle label="일일 손실 한도 도달" checked={r.notify.dailyLossHit}
+              onChange={(v) => setR({ ...r, notify: { ...r.notify, dailyLossHit: v } })} />
+            <Toggle label="큰 수익/손실 발생" checked={r.notify.bigPnl}
+              onChange={(v) => setR({ ...r, notify: { ...r.notify, bigPnl: v } })} />
+          </Card>
+        )}
 
         <Card className="space-y-3">
           <SectionTitle title="증권사 연동" sub="안전한 서버 측 연동만 지원합니다" />
@@ -59,30 +84,32 @@ export default function Settings() {
                 </span>
                 <div>
                   <div className="text-sm font-semibold">키움증권</div>
-                  <div className="text-[11px] text-muted-foreground">OpenAPI · 연동 준비 중</div>
+                  <div className="text-[11px] text-muted-foreground">OpenAPI · FastAPI 백엔드 전용</div>
                 </div>
               </div>
-              <span className="chip border-warning/40 bg-warning-soft text-warning">준비 중</span>
+              <span className={health?.kiwoomConfigured ? "chip border-success/40 bg-success/10 text-success" : "chip border-warning/40 bg-warning-soft text-warning"}>
+                {health?.kiwoomConfigured ? "설정 확인" : "설정 필요"}
+              </span>
             </div>
             <Button variant="outline" className="mt-3 w-full" disabled>
-              연동 설정 열기 (출시 예정)
+              연동 설정은 backend/.env에서만 관리
             </Button>
           </div>
           <div className="flex items-start gap-2 rounded-xl border border-border bg-muted/40 p-3 text-[12px] text-muted-foreground">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-            API 키 · 시크릿은 절대 프론트엔드에 저장되지 않습니다. 실제 주문 실행은 서버 측 워커에서만 수행되며, 대시보드는 내부 API로만 통신합니다.
+            API 키 · 시크릿 · 토큰 · 계좌번호 원문은 프론트엔드에 저장되거나 노출되지 않습니다. 이번 단계에서는 계좌 조회만 연결하며 주문 API는 호출하지 않습니다.
           </div>
         </Card>
 
         <Card className="space-y-3">
           <SectionTitle title="서버 상태" />
-          <Row icon={<ServerCog className="h-4 w-4" />} label="시세 어댑터" value="정상 (데모)" tone="ok" />
-          <Row icon={<ServerCog className="h-4 w-4" />} label="주문 워커" value="연결됨 (데모)" tone="ok" />
-          <Row icon={<ServerCog className="h-4 w-4" />} label="데이터 동기화" value="3초 전" tone="ok" />
-          <Row icon={<Info className="h-4 w-4" />} label="앱 버전" value="0.1.0 · prototype" />
+          <Row icon={<ServerCog className="h-4 w-4" />} label="백엔드 API" value={health?.connection.api ?? "disconnected"} tone={health?.connection.api === "connected" ? "ok" : undefined} />
+          <Row icon={<ServerCog className="h-4 w-4" />} label="키움 모드" value={health?.mode ?? "mock"} tone={health?.mode === "mock" ? "ok" : undefined} />
+          <Row icon={<ServerCog className="h-4 w-4" />} label="마지막 정상 갱신" value={health?.lastUpdatedAt ? new Date(health.lastUpdatedAt).toLocaleTimeString("ko-KR") : "없음"} tone={health?.lastUpdatedAt ? "ok" : undefined} />
+          <Row icon={<Info className="h-4 w-4" />} label="오류 상태" value={health?.lastError ?? "없음"} tone={!health?.lastError ? "ok" : undefined} />
         </Card>
 
-        <Button className="w-full" onClick={() => toast.success("설정 저장됨 (데모)")}>
+        <Button className="w-full" onClick={save} disabled={!r}>
           설정 저장
         </Button>
 
@@ -123,7 +150,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-function Row({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone?: "ok" }) {
+function Row({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone?: "ok" }) {
   return (
     <div className="flex items-center justify-between rounded-xl border border-border bg-surface-3/40 px-3 py-2.5">
       <div className="flex items-center gap-2 text-sm">
