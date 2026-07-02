@@ -2,10 +2,34 @@ import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { Card } from "@/components/common/Card";
 import { DeltaPct } from "@/components/common/DeltaPct";
 import { won, wonCompact } from "@/lib/format";
-import { portfolio } from "@/services/mock/data";
+import { useApp } from "@/store/app";
+import { usePortfolioQuery } from "@/services/adapters";
+import { errorMessage, formatQueryUpdatedAt } from "@/services/apiClient";
 
 export function PortfolioCard() {
-  const p = portfolio;
+  const { selectedAccountId } = useApp();
+  const { data: p, dataUpdatedAt, isLoading, isError, error } = usePortfolioQuery(selectedAccountId);
+
+  if (isLoading && !p) {
+    return (
+      <Card className="p-4">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">평가자산</div>
+        <div className="mt-3 h-8 w-40 rounded-md bg-muted/60" />
+        <div className="mt-4 h-16 rounded-xl bg-surface-3/50" />
+      </Card>
+    );
+  }
+
+  if (!p) {
+    return (
+      <Card className="space-y-2 p-4">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">평가자산</div>
+        <div className="text-sm font-semibold text-danger">계좌 데이터를 불러오지 못했습니다.</div>
+        <p className="text-xs text-muted-foreground">{errorMessage(error)}</p>
+      </Card>
+    );
+  }
+
   const up = p.dayPnl >= 0;
   return (
     <Card className="overflow-hidden p-0">
@@ -17,12 +41,21 @@ export function PortfolioCard() {
               {p.equity.toLocaleString("ko-KR")}
               <span className="ml-1 text-base font-medium text-muted-foreground">원</span>
             </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              마지막 정상 갱신 · {formatQueryUpdatedAt(dataUpdatedAt)}
+            </div>
           </div>
           <div className="text-right">
             <DeltaPct value={p.dayPnlPct} className="text-base" />
             <div className={`text-xs num ${up ? "text-up" : "text-down"}`}>{won(p.dayPnl, { sign: true })}</div>
           </div>
         </div>
+
+        {isError && (
+          <div className="rounded-lg border border-warning/30 bg-warning-soft/50 px-3 py-2 text-[11px] text-warning">
+            최신 API 조회 실패 · 마지막 정상 데이터를 표시 중입니다. {errorMessage(error)}
+          </div>
+        )}
 
         <div className="grid grid-cols-3 divide-x divide-border rounded-xl border border-border bg-surface-3/40">
           <Stat label="누적 손익" value={won(p.cumulativePnl, { sign: true })} tone={p.cumulativePnl >= 0 ? "up" : "down"} />
