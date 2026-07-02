@@ -10,12 +10,16 @@ git status --short
 git branch --show-current
 docker compose -f deploy/aws/lightsail/docker-compose.yml ps
 curl http://127.0.0.1/api/health
+curl http://127.0.0.1/api/kiwoom/status
 ```
 
-For public API domain:
+For public API domain or static IP:
 
 ```bash
+curl http://15.165.117.114/api/health
+curl http://15.165.117.114/api/kiwoom/status
 curl https://api.example.com/api/health
+curl https://api.example.com/api/kiwoom/status
 ```
 
 ## Server Restart
@@ -28,6 +32,7 @@ After SSH reconnect:
 cd ~/strategy-pilot
 docker compose -f deploy/aws/lightsail/docker-compose.yml ps
 curl http://127.0.0.1/api/health
+curl http://127.0.0.1/api/kiwoom/status
 ```
 
 If containers did not start automatically:
@@ -74,8 +79,13 @@ Verify:
 ```bash
 docker compose -f deploy/aws/lightsail/docker-compose.yml ps
 curl http://127.0.0.1/api/health
+curl http://127.0.0.1/api/kiwoom/status
 curl http://127.0.0.1/api/accounts
+curl http://127.0.0.1/api/account/performance
+curl -i -X POST http://127.0.0.1/api/orders
 ```
+
+The order endpoint must return 403 while `KIWOOM_READ_ONLY=true` and `KIWOOM_ENABLE_ORDER=false`.
 
 ## Logs
 
@@ -141,6 +151,7 @@ Important rules:
 - Do not commit `.env`.
 - Keep frontend `VITE_API_BASE_URL` free of secrets.
 - Switch to `KIWOOM_MODE=live` only when IP registration and credentials are ready.
+- Keep `KIWOOM_READ_ONLY=true` and `KIWOOM_ENABLE_ORDER=false` until the risk engine and order adapter are implemented.
 
 ## Backup
 
@@ -235,6 +246,7 @@ git pull --ff-only origin feature/backend-account-integration
 docker compose -f deploy/aws/lightsail/docker-compose.yml up -d --build
 docker compose -f deploy/aws/lightsail/docker-compose.yml ps
 curl -f http://127.0.0.1/api/health
+curl -f http://127.0.0.1/api/kiwoom/status
 ```
 
 4. On failure, workflow should stop and preserve logs.
@@ -246,15 +258,18 @@ Before deploy:
 
 - Confirm branch: `feature/backend-account-integration`
 - Confirm `.env` exists on server
-- Confirm no order API is being introduced
-- Confirm CORS includes frontend domain
-- Confirm domain DNS points to Lightsail static IP
+- Confirm CORS includes frontend domain or static IP
+- Confirm `KIWOOM_READ_ONLY=true`
+- Confirm `KIWOOM_ENABLE_ORDER=false`
+- Confirm domain DNS points to Lightsail static IP, if using a domain
 
 After deploy:
 
 - `curl /api/health`
+- `curl /api/kiwoom/status`
 - `curl /api/accounts`
 - `curl /api/account/performance`
+- `curl -i -X POST /api/orders` returns 403
 - check backend logs
 - check frontend can call API from mobile browser
 
