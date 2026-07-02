@@ -23,6 +23,8 @@ class HealthStatus(BaseModel):
     mode: Literal["mock", "live"]
     kiwoomConfigured: bool
     kiwoomMissing: list[str]
+    readOnly: bool
+    orderEnabled: bool
     lastUpdatedAt: str | None
     lastError: str | None
     connection: ConnectionStatus
