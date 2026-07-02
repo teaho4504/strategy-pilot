@@ -101,6 +101,31 @@ docker compose -f deploy/aws/lightsail/docker-compose.yml up -d --build
 
 도메인이 있으면 `API_HOST=api.your-domain.com`으로 Caddy HTTPS를 사용합니다. 도메인이 없으면 임시로 `http://STATIC_IP` 테스트만 가능합니다. 모바일 상시 접속은 HTTPS 도메인 사용을 권장합니다.
 
+## Vercel 프론트엔드 배포
+
+React/Vite 프론트엔드는 Vercel에 배포하고, FastAPI 백엔드는 AWS Lightsail에 유지하는 구성을 권장합니다.
+
+Vercel 프로젝트 설정:
+
+```text
+Repository: teaho4504/strategy-pilot
+Branch: feature/backend-account-integration
+Framework Preset: Vite
+Build Command: npm run build
+Output Directory: dist
+Install Command: npm install
+```
+
+Vercel 환경변수:
+
+```env
+VITE_API_BASE_URL=http://15.165.117.114
+```
+
+위 주소는 현재 AWS Lightsail 백엔드 임시 주소입니다. Vercel은 HTTPS로 서비스되므로 브라우저에서 HTTP API 호출이 차단될 수 있습니다. 운영 배포에서는 `https://api.your-domain.com` 같은 HTTPS API 도메인을 연결한 뒤 `VITE_API_BASE_URL`을 해당 주소로 바꿉니다.
+
+상세 절차는 `docs/VERCEL.md`를 확인합니다. Vercel에는 키움 App Key, Secret Key, Access Token, 계좌번호를 넣지 않습니다.
+
 ## API 목록
 
 - `GET /api/health`
