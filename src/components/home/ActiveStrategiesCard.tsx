@@ -1,11 +1,12 @@
 import { Card, SectionTitle } from "@/components/common/Card";
 import { StatusBadge } from "@/components/common/DemoBadge";
 import { DeltaPct } from "@/components/common/DeltaPct";
-import { strategies } from "@/services/mock/data";
+import { useStrategiesQuery } from "@/services/adapters";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 
 export function ActiveStrategiesCard() {
+  const { data: strategies = [], isLoading, isError } = useStrategiesQuery();
   const running = strategies.filter((s) => s.status === "running").length;
   const totalSignals = strategies.reduce((a, b) => a + b.signalsToday, 0);
   const totalFills = strategies.reduce((a, b) => a + b.fillsToday, 0);
@@ -25,25 +26,31 @@ export function ActiveStrategiesCard() {
         <Mini label="오늘 신호" value={`${totalSignals}`} />
         <Mini label="오늘 체결" value={`${totalFills}`} />
       </div>
-      <ul className="space-y-2">
-        {strategies.slice(0, 3).map((s) => (
-          <li key={s.id}>
-            <Link
-              to={`/strategies`}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-3/40 p-3 hover:border-border-strong"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={s.status} />
-                  <span className="truncate text-sm font-semibold">{s.name}</span>
+      {isLoading ? (
+        <div className="rounded-xl border border-border bg-surface-3/40 p-3 text-sm text-muted-foreground">전략 조회 중...</div>
+      ) : isError ? (
+        <div className="rounded-xl border border-danger/30 bg-danger-soft/50 p-3 text-sm text-danger">전략 데이터를 불러오지 못했습니다.</div>
+      ) : (
+        <ul className="space-y-2">
+          {strategies.slice(0, 3).map((s) => (
+            <li key={s.id}>
+              <Link
+                to={`/strategies`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-3/40 p-3 hover:border-border-strong"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={s.status} />
+                    <span className="truncate text-sm font-semibold">{s.name}</span>
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-muted-foreground">{s.universe}</div>
                 </div>
-                <div className="mt-1 truncate text-[11px] text-muted-foreground">{s.universe}</div>
-              </div>
-              <DeltaPct value={s.dayReturnPct} />
-            </Link>
-          </li>
-        ))}
-      </ul>
+                <DeltaPct value={s.dayReturnPct} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
