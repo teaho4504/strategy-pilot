@@ -18,7 +18,7 @@ The current deployment is API-only. It does not run a real-time trading worker o
 ## Prerequisites
 
 - AWS account with Lightsail access
-- Lightsail instance running Ubuntu 24.04 LTS
+- Lightsail instance running Ubuntu 22.04 or 24.04 LTS
 - Lightsail static IP attached to the instance
 - Ports 22, 80, 443 open in Lightsail firewall
 - Optional but recommended: API domain such as `api.example.com` pointing to the static IP
@@ -28,7 +28,7 @@ The current deployment is API-only. It does not run a real-time trading worker o
 
 1. Open AWS Lightsail.
 2. Create an instance.
-3. Select Linux/Unix and Ubuntu 24.04 LTS.
+3. Select Linux/Unix and Ubuntu LTS.
 4. Choose a region close to Kiwoom/API users. Seoul is preferred if available, otherwise Tokyo.
 5. Start with at least 1 vCPU / 2 GB RAM for account lookup and dashboard API.
 6. Attach a static IP.
@@ -73,7 +73,9 @@ Mock mode example:
 
 ```env
 KIWOOM_MODE=mock
-BACKEND_CORS_ORIGINS=https://your-frontend-domain.com,http://localhost:8080
+BACKEND_CORS_ORIGINS=https://your-frontend-domain.com,http://localhost:8080,http://15.165.117.114
+KIWOOM_READ_ONLY=true
+KIWOOM_ENABLE_ORDER=false
 KIWOOM_WATCHLIST=005930,000660,035420
 ```
 
@@ -81,11 +83,14 @@ Live account lookup example:
 
 ```env
 KIWOOM_MODE=live
-BACKEND_CORS_ORIGINS=https://your-frontend-domain.com
+BACKEND_CORS_ORIGINS=https://your-frontend-domain.com,http://15.165.117.114
 KIWOOM_APP_KEY=...
 KIWOOM_SECRET_KEY=...
 KIWOOM_ACCOUNT_NO=...
-KIWOOM_REAL_API_BASE_URL=https://api.kiwoom.com
+KIWOOM_BASE_URL=https://api.kiwoom.com
+KIWOOM_TOKEN_URL=https://api.kiwoom.com/oauth2/token
+KIWOOM_READ_ONLY=true
+KIWOOM_ENABLE_ORDER=false
 KIWOOM_STEX_TP=0
 KIWOOM_QRY_TP=3
 KIWOOM_DMST_STEX_TP=KRX
@@ -141,6 +146,7 @@ Local on the server:
 
 ```bash
 curl http://127.0.0.1/api/health
+curl http://127.0.0.1/api/kiwoom/status
 curl http://127.0.0.1/api/accounts
 curl http://127.0.0.1/api/account/portfolio
 curl http://127.0.0.1/api/account/performance
@@ -149,10 +155,18 @@ curl http://127.0.0.1/api/account/holdings
 curl http://127.0.0.1/api/market/watchlist
 ```
 
+Public static IP:
+
+```bash
+curl http://15.165.117.114/api/health
+curl http://15.165.117.114/api/kiwoom/status
+```
+
 With domain:
 
 ```bash
 curl https://api.example.com/api/health
+curl https://api.example.com/api/kiwoom/status
 curl https://api.example.com/api/accounts
 curl https://api.example.com/api/account/performance
 ```
@@ -160,14 +174,29 @@ curl https://api.example.com/api/account/performance
 Expected mock mode behavior:
 
 - `/api/health` returns `mode=mock`.
+- `/api/kiwoom/status` returns `readOnly=true` and `orderEnabled=false`.
 - Account and portfolio endpoints return demo data.
-- No order endpoint exists.
+- Order endpoints return 403.
+
+Order guard test:
+
+```bash
+curl -i -X POST http://127.0.0.1/api/orders
+curl -i -X POST http://127.0.0.1/api/orders/cancel
+```
 
 Expected live mode before valid credentials:
 
-- `/api/health` reports missing Kiwoom configuration.
+- `/api/health` and `/api/kiwoom/status` report missing Kiwoom configuration.
 - Account endpoints return explicit API errors.
 - The frontend shows the error instead of silently falling back to mock data.
+
+Expected live mode after valid credentials:
+
+- `/api/kiwoom/status` reports credentials and account configured.
+- `/api/accounts` tests `ka00001` account lookup.
+- `/api/account/performance` tests `ka10085` performance lookup.
+- Order endpoints still return 403 while `KIWOOM_READ_ONLY=true` and `KIWOOM_ENABLE_ORDER=false`.
 
 ## 7. Frontend Deployment Setting
 
@@ -180,7 +209,7 @@ VITE_API_BASE_URL=https://api.example.com
 For temporary static IP testing:
 
 ```env
-VITE_API_BASE_URL=http://STATIC_IP
+VITE_API_BASE_URL=http://15.165.117.114
 ```
 
 ## Troubleshooting
@@ -227,9 +256,12 @@ Check:
 Check:
 
 - `KIWOOM_MODE=live`
+- `KIWOOM_READ_ONLY=true`
+- `KIWOOM_ENABLE_ORDER=false`
 - App key and secret are correct
 - account number is correct
 - Lightsail static IP is registered with Kiwoom if required
+- `/api/kiwoom/status` token state
 - Kiwoom TR payload and response fields match the current official guide
 - token issue flow works before account TR tests
 
