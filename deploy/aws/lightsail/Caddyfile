@@ -1,0 +1,8 @@
+{$API_HOST} {
+  encode zstd gzip
+
+  @api path /api/*
+  reverse_proxy @api backend:8000
+
+  respond /healthz 200
+}
