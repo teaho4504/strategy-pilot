@@ -13,7 +13,29 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-프론트엔드는 Vite proxy를 통해 `/api` 요청을 `http://localhost:8000`으로 전달합니다.
+프론트엔드는 로컬 개발에서 Vite proxy를 통해 `/api` 요청을 `http://localhost:8000`으로 전달합니다.
+
+## 모바일 접속
+
+같은 Wi-Fi의 모바일 기기에서 로컬 백엔드에 접근하려면 백엔드를 `0.0.0.0`으로 실행합니다.
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+프론트엔드 `.env`에는 Mac 또는 서버의 LAN IP를 넣습니다.
+
+```bash
+VITE_API_BASE_URL=http://192.168.0.10:8000
+```
+
+백엔드 `.env`의 `CORS_ORIGINS`에는 모바일에서 접속하는 프론트 주소를 추가합니다.
+
+```bash
+CORS_ORIGINS=http://localhost:8080,http://192.168.0.10:8080
+```
+
+Mac을 꺼도 모바일에서 접속해야 한다면 백엔드는 AWS Lightsail/EC2 같은 상시 서버에 배포하고, 프론트는 Vercel/Amplify에서 `VITE_API_BASE_URL=https://api.your-domain.com`으로 빌드합니다.
 
 ## 환경변수
 
@@ -24,7 +46,7 @@ KIWOOM_APP_KEY=
 KIWOOM_APP_SECRET=
 KIWOOM_ACCESS_TOKEN=
 KIWOOM_ACCOUNT_NO=
-CORS_ORIGINS=http://localhost:8080,http://localhost:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:8080,http://localhost:5173,http://localhost:3000,http://192.168.0.10:8080,https://your-frontend-domain.com
 ```
 
 `.env`에는 실제 값을 넣을 수 있지만 Git에 포함하지 않습니다. App Key, Secret, Access Token, 계좌번호는 프론트엔드 `VITE_*` 환경변수에 절대 넣지 않습니다.
