@@ -2,15 +2,17 @@
 
 FastAPI backend for read-only Kiwoom account and watchlist queries.
 
-This backend is intentionally limited to account/market lookup. It does not implement order, amend, cancel, or automated trading APIs.
+This backend is intentionally limited to account/market lookup. Order, amend, and cancel endpoints are disabled and return 403 in this phase.
 
 ## Safety Rules
 
 - Default mode is `KIWOOM_MODE=mock`.
 - Kiwoom live calls are blocked unless `KIWOOM_MODE=live` is explicitly set.
+- Default live safety is `KIWOOM_READ_ONLY=true` and `KIWOOM_ENABLE_ORDER=false`.
 - Keep `KIWOOM_APP_KEY`, `KIWOOM_SECRET_KEY`, access tokens, and full account numbers in `backend/.env` only.
 - Do not put Kiwoom credentials in `VITE_*` variables.
 - `.env` and `backend/.env` are ignored by Git.
+- Token values, app secrets, and account numbers must be masked in logs.
 
 ## Setup
 
@@ -39,22 +41,30 @@ KIWOOM_MODE=mock
 KIWOOM_APP_KEY=
 KIWOOM_SECRET_KEY=
 KIWOOM_ACCOUNT_NO=
+KIWOOM_BASE_URL=https://api.kiwoom.com
+KIWOOM_TOKEN_URL=https://api.kiwoom.com/oauth2/token
+KIWOOM_READ_ONLY=true
+KIWOOM_ENABLE_ORDER=false
 KIWOOM_WATCHLIST=005930,000660,035420
 ```
 
-Use `KIWOOM_MODE=live` only after credentials and Kiwoom API access/IP settings are ready.
+Use `KIWOOM_MODE=live` only after credentials, Kiwoom API access, and IP settings are ready.
 
 ## APIs
 
 | Method | Path | Source TR |
 | --- | --- | --- |
 | GET | `/api/health` | backend runtime state |
+| GET | `/api/kiwoom/status` | mode, token status, read-only safety |
 | GET | `/api/accounts` | `ka00001` account number lookup |
 | GET | `/api/account/portfolio` | `kt00004` + `ka10085` |
 | GET | `/api/account/performance` | `ka10085` with server-side continuation |
 | GET | `/api/account/cash` | `kt00001` |
 | GET | `/api/account/holdings` | `kt00005` + `ka10085` |
 | GET | `/api/market/watchlist` | `ka10001` REST polling |
+| POST | `/api/orders` | disabled, always 403 |
+| POST | `/api/orders/cancel` | disabled, always 403 |
+| POST | `/api/orders/amend` | disabled, always 403 |
 
 ## Official Kiwoom REST API Notes
 
@@ -74,6 +84,7 @@ Mock mode:
 
 ```bash
 curl http://localhost:8000/api/health
+curl http://localhost:8000/api/kiwoom/status
 curl http://localhost:8000/api/accounts
 curl http://localhost:8000/api/account/portfolio
 curl http://localhost:8000/api/account/cash
@@ -82,11 +93,22 @@ curl http://localhost:8000/api/account/performance
 curl http://localhost:8000/api/market/watchlist
 ```
 
+Disabled order guard:
+
+```bash
+curl -i -X POST http://localhost:8000/api/orders
+curl -i -X POST http://localhost:8000/api/orders/cancel
+```
+
+Both must return 403.
+
 Live mode account lookup test:
 
 ```bash
 KIWOOM_MODE=live uvicorn app.main:app --reload --port 8000
+curl http://localhost:8000/api/kiwoom/status
 curl http://localhost:8000/api/accounts
+curl http://localhost:8000/api/account/performance
 ```
 
 The frontend should show errors if the backend is down or Kiwoom live credentials are invalid. It should not silently fall back to mock data on API failure.
