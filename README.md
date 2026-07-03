@@ -77,7 +77,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Vite 개발 서버는 `/api/*`를 `http://localhost:8000`으로 proxy합니다. 모바일/클라우드에서는 `VITE_API_BASE_URL`을 API 서버 주소로 지정합니다.
+Vite 개발 서버는 `/api/*`를 `http://localhost:8000`으로 proxy합니다. 모바일/클라우드에서 HTTPS API 도메인을 직접 호출해야 할 때만 `VITE_API_BASE_URL`을 지정합니다.
 
 ```env
 VITE_API_BASE_URL=https://api.your-domain.com
@@ -116,13 +116,18 @@ Output Directory: dist
 Install Command: npm install
 ```
 
-Vercel 환경변수:
+현재 `vercel.json`은 `/api/:path*` 요청을 AWS Lightsail 백엔드로 프록시합니다.
 
-```env
-VITE_API_BASE_URL=http://15.165.117.114
+```text
+https://strategy-pilot.vercel.app/api/health
+  -> http://15.165.117.114/api/health
 ```
 
-위 주소는 현재 AWS Lightsail 백엔드 임시 주소입니다. Vercel은 HTTPS로 서비스되므로 브라우저에서 HTTP API 호출이 차단될 수 있습니다. 운영 배포에서는 `https://api.your-domain.com` 같은 HTTPS API 도메인을 연결한 뒤 `VITE_API_BASE_URL`을 해당 주소로 바꿉니다.
+따라서 현재 Vercel 환경변수 `VITE_API_BASE_URL`은 비워둘 수 있습니다. 운영용 HTTPS API 도메인을 연결한 뒤에는 선택적으로 아래처럼 직접 API 주소를 지정할 수 있습니다.
+
+```env
+VITE_API_BASE_URL=https://api.your-domain.com
+```
 
 상세 절차는 `docs/VERCEL.md`를 확인합니다. Vercel에는 키움 App Key, Secret Key, Access Token, 계좌번호를 넣지 않습니다.
 
