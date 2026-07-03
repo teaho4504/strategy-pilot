@@ -7,6 +7,7 @@ This guide deploys the mobile-first React dashboard to Vercel while keeping the 
 ```text
 Mobile / PC browser
   -> Vercel React dashboard
+  -> Vercel /api proxy rewrite
   -> AWS Lightsail FastAPI backend
   -> Kiwoom REST API
 ```
@@ -15,6 +16,12 @@ Backend API currently running:
 
 ```text
 http://15.165.117.114
+```
+
+Public frontend:
+
+```text
+https://strategy-pilot.vercel.app
 ```
 
 ## Why Vercel For Frontend
@@ -42,7 +49,12 @@ Output Directory: dist
 Install Command: npm install
 ```
 
-`vercel.json` also includes an SPA fallback rewrite to `/index.html`.
+`vercel.json` includes:
+
+- `/api/:path*` rewrite to the AWS Lightsail backend
+- SPA fallback rewrite to `/index.html`
+
+This allows the frontend to call same-origin API paths such as `/api/health` from `https://strategy-pilot.vercel.app`.
 
 ## 1. Import Project
 
@@ -64,17 +76,15 @@ If Vercel defaults to `main`, change the production branch or create a deploymen
 
 ## 2. Configure Environment Variables
 
-Add this variable in Vercel Project Settings -> Environment Variables:
+For the current proxy-based setup, `VITE_API_BASE_URL` can be omitted in Vercel. The frontend will call `/api/*`, and Vercel will proxy those requests to AWS Lightsail.
+
+Optional direct API mode:
 
 ```env
-VITE_API_BASE_URL=http://15.165.117.114
+VITE_API_BASE_URL=https://api.your-domain.com
 ```
 
-Apply it to:
-
-- Production
-- Preview
-- Development, optional
+Use direct API mode only after the AWS backend has an HTTPS domain.
 
 Do not add any of these to Vercel:
 
@@ -96,23 +106,22 @@ After deployment completes, open the Vercel URL on mobile and PC.
 Expected behavior:
 
 - Dashboard loads from Vercel.
-- API calls go to `http://15.165.117.114`.
+- API calls use `https://strategy-pilot.vercel.app/api/*`.
+- Vercel proxies `/api/*` to `http://15.165.117.114/api/*`.
 - `/api/health` and account data are loaded from AWS Lightsail backend.
 - If backend is down or Kiwoom credentials are invalid, UI shows an error state instead of silently using mock data.
 
 ## 4. Verify From Browser
 
-Open the Vercel app and inspect network requests.
-
-Expected API base:
+Open these URLs:
 
 ```text
-http://15.165.117.114/api/health
-http://15.165.117.114/api/accounts
-http://15.165.117.114/api/account/performance
+https://strategy-pilot.vercel.app
+https://strategy-pilot.vercel.app/api/health
+https://strategy-pilot.vercel.app/api/kiwoom/status
 ```
 
-Direct API checks:
+Direct backend checks:
 
 ```bash
 curl http://15.165.117.114/api/health
@@ -120,21 +129,28 @@ curl http://15.165.117.114/api/kiwoom/status
 curl http://15.165.117.114/api/accounts
 ```
 
-## 5. Important HTTP/HTTPS Note
+Expected browser network requests:
 
-Vercel serves the frontend over HTTPS. Browsers may block HTTPS pages calling plain HTTP APIs as mixed content.
+```text
+https://strategy-pilot.vercel.app/api/health
+https://strategy-pilot.vercel.app/api/accounts
+https://strategy-pilot.vercel.app/api/account/performance
+```
 
-If the browser blocks API calls to `http://15.165.117.114`, use a real API domain with HTTPS:
+## 5. HTTP/HTTPS Note
+
+The proxy rewrite avoids browser mixed-content blocking because the browser only calls HTTPS Vercel URLs.
+
+For a production-grade setup, still add a real HTTPS API domain:
 
 ```text
 https://api.your-domain.com
 ```
 
-Then update Vercel environment variable:
+Then either:
 
-```env
-VITE_API_BASE_URL=https://api.your-domain.com
-```
+- keep the Vercel `/api/*` proxy and update `vercel.json` destination to the HTTPS API domain, or
+- set `VITE_API_BASE_URL=https://api.your-domain.com` in Vercel and call the API directly.
 
 The backend deployment already includes Caddy. Point the API domain A record to the Lightsail static IP and set:
 
@@ -179,18 +195,18 @@ dist
 
 Check:
 
-- `VITE_API_BASE_URL` is set in Vercel.
+- `vercel.json` includes the `/api/:path*` rewrite.
 - AWS backend is running.
 - `curl http://15.165.117.114/api/health` works.
-- Browser is not blocking mixed content.
-- `BACKEND_CORS_ORIGINS` includes the Vercel app origin.
+- `https://strategy-pilot.vercel.app/api/health` works after Vercel redeploy.
+- Vercel deployed the latest `feature/backend-account-integration` commit.
 
 ### CORS error
 
-Add the Vercel URL to `backend/.env` on AWS:
+The proxy-based setup usually avoids browser CORS because the browser calls the same Vercel origin. If direct API mode is used, add the Vercel URL to `backend/.env` on AWS:
 
 ```env
-BACKEND_CORS_ORIGINS=https://your-vercel-app.vercel.app,http://15.165.117.114
+BACKEND_CORS_ORIGINS=https://strategy-pilot.vercel.app,http://15.165.117.114
 ```
 
 Then redeploy backend:
@@ -202,7 +218,7 @@ docker compose -f deploy/aws/lightsail/docker-compose.yml up -d --build
 
 ### Mixed content error
 
-Use HTTPS API domain instead of `http://15.165.117.114`.
+Use the Vercel `/api/*` proxy rewrite or an HTTPS API domain instead of direct browser calls to `http://15.165.117.114`.
 
 ## 8. Current Safety Position
 
