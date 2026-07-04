@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 
 CONFIRM_VALUE = "I_UNDERSTAND_READ_ONLY"
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 SENSITIVE_ENV_NAMES = {
     "KIWOOM_APP_KEY",
@@ -19,6 +21,21 @@ SENSITIVE_ENV_NAMES = {
 
 class LiveVerifyBlocked(RuntimeError):
     pass
+
+
+def load_backend_env_file(path: Optional[Path] = None) -> None:
+    env_path = path or BACKEND_DIR / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(errors="replace").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
 
 
 @dataclass(frozen=True)
@@ -166,6 +183,7 @@ async def run_live_readonly_verification() -> int:
 
 def main() -> int:
     try:
+        load_backend_env_file()
         return asyncio.run(run_live_readonly_verification())
     except LiveVerifyBlocked as exc:
         print(str(exc))

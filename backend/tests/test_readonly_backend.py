@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,6 +21,7 @@ from app.services.token_manager import TokenManagerError, token_manager
 from scripts.verify_live_readonly import (
     CONFIRM_VALUE,
     LiveVerifyBlocked,
+    load_backend_env_file,
     print_safe_step_result,
     validate_live_verify_environment,
 )
@@ -164,6 +166,23 @@ def test_live_verify_environment_accepts_readonly_confirm():
             "KIWOOM_LIVE_VERIFY_CONFIRM": CONFIRM_VALUE,
         }
     )
+
+
+def test_live_verify_loads_backend_env_file_without_export(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "KIWOOM_MODE=live\n"
+        "KIWOOM_READ_ONLY=true\n"
+        "KIWOOM_ENABLE_ORDER=false\n"
+        f"KIWOOM_LIVE_VERIFY_CONFIRM={CONFIRM_VALUE}\n",
+        encoding="utf-8",
+    )
+    for key in ("KIWOOM_MODE", "KIWOOM_READ_ONLY", "KIWOOM_ENABLE_ORDER", "KIWOOM_LIVE_VERIFY_CONFIRM"):
+        monkeypatch.delenv(key, raising=False)
+
+    load_backend_env_file(env_file)
+
+    validate_live_verify_environment(dict(os.environ))
 
 
 def test_safe_response_output_does_not_print_sensitive_values(capsys):

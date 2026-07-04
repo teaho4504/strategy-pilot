@@ -60,6 +60,8 @@ Verification command from the repository root:
 PYTHONPATH=backend python3 backend/scripts/verify_live_readonly.py
 ```
 
+The script loads `backend/.env` before checking the safety guard. You do not need to export these values in the shell when they are present in `backend/.env`. If you set them in a shell instead, use `export`; plain `KEY=value` assignments are not inherited by Python child processes.
+
 Verification order:
 
 1. `au10001`: access token issue
