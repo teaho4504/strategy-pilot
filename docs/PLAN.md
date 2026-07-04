@@ -6,19 +6,30 @@ The current project is a Vite React frontend mock dashboard.
 
 ## Phase 1: FastAPI Read-only Account Foundation
 
+Status: in progress.
+
 Scope:
 
-- FastAPI backend skeleton
-- Health endpoint
-- Account identifier lookup structure
-- Cash response schema
-- Portfolio response schema
-- Holdings response schema
-- Performance response schema
-- Mock mode by default
-- Kiwoom read-only adapter interface
-- Server-side token handling plan
-- Frontend HTTP adapter plan for FastAPI `/api/*`
+- FastAPI backend skeleton. Implemented.
+- Health endpoint. Implemented.
+- Account identifier lookup structure. Implemented as read-only backend service.
+- Cash response schema. Implemented.
+- Portfolio response schema. Implemented.
+- Holdings response schema. Implemented.
+- Performance response schema. Implemented.
+- Mock mode by default. Implemented.
+- Kiwoom read-only adapter interface. Implemented for selected account TRs.
+- Server-side token handling plan. Implemented as backend-only token manager structure.
+- Frontend HTTP adapter plan for FastAPI `/api/*`. Planned; frontend still uses the existing mock adapter.
+
+Supported Phase 1 Kiwoom TRs:
+
+- `au10001`: backend-only OAuth token issue.
+- `ka00001`: account lookup.
+- `kt00001`: cash lookup.
+- `kt00004`: account valuation lookup.
+- `kt00005`: holdings lookup.
+- `ka10085`: account performance lookup.
 
 Explicitly out of scope:
 
@@ -33,6 +44,11 @@ Explicitly out of scope:
 - Vercel config changes
 - UI redesign
 - Package changes unrelated to backend setup
+- `ka01690` daily balance performance
+- order TRs
+- unsettled/fill query TRs
+- realtime WebSocket TRs
+- quote, order book, and chart TRs
 
 ## Phase 1 Source Material
 
@@ -55,15 +71,18 @@ Potential reuse list:
 - `backend/requirements.txt`
 - `backend/README.md`
 
-Do not copy or cherry-pick in the planning phase. Actual implementation must happen in a separate task.
+Do not merge the branch wholesale. Phase 1 implementation should remain limited to read-only backend behavior.
 
 ## Later Phases
 
 ### Phase 2: Kiwoom Read-only Validation
 
+- Prepare local live read-only verification. In progress on `feature/fastapi-readonly-account`.
 - Validate mock mode behavior.
 - Validate missing live credential errors.
 - Test read-only Kiwoom account APIs only after credentials are configured server-side.
+- Require explicit `KIWOOM_LIVE_VERIFY_CONFIRM=I_UNDERSTAND_READ_ONLY` before live verification.
+- Print only schema keys and success/failure, never live response values.
 
 ### Phase 3: Realtime Gateway
 
@@ -79,4 +98,3 @@ Do not copy or cherry-pick in the planning phase. Actual implementation must hap
 
 - Separate future review.
 - Live trading remains blocked until explicitly approved.
-
