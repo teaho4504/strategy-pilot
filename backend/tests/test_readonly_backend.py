@@ -17,11 +17,12 @@ from app.services.account_service import (
     map_portfolio_response,
 )
 from app.services.kiwoom_client import KiwoomConfigurationError, KiwoomResponse, TR_SPECS
-from app.services.token_manager import TokenManagerError, token_manager
+from app.services.token_manager import TokenManager, TokenManagerError, token_manager
 from scripts.verify_live_readonly import (
     CONFIRM_VALUE,
     LiveVerifyBlocked,
     load_backend_env_file,
+    print_safe_failure,
     print_safe_step_result,
     validate_live_verify_environment,
 )
@@ -122,6 +123,106 @@ def test_token_failure_returns_backend_error(monkeypatch):
     assert "configured-account" not in response.text
 
 
+class FakeTokenResponse:
+    def __init__(self, body, status_code=200):
+        self._body = body
+        self.status_code = status_code
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        return None
+
+
+class FakeTokenClient:
+    def __init__(self, response):
+        self.response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+    async def post(self, *args, **kwargs):
+        return self.response
+
+
+def configure_live_token_env(monkeypatch):
+    monkeypatch.setenv("KIWOOM_MODE", "live")
+    monkeypatch.setenv("KIWOOM_APP_KEY", "configured-app-key")
+    monkeypatch.setenv("KIWOOM_SECRET_KEY", "configured-secret")
+    monkeypatch.setenv("KIWOOM_ACCOUNT_NO", "configured-account")
+    get_settings.cache_clear()
+
+
+def install_fake_token_response(monkeypatch, body, status_code=200):
+    monkeypatch.setattr(
+        "app.services.token_manager.httpx.AsyncClient",
+        lambda timeout=10: FakeTokenClient(FakeTokenResponse(body, status_code=status_code)),
+    )
+
+
+def test_au10001_token_field_is_accepted(monkeypatch):
+    configure_live_token_env(monkeypatch)
+    install_fake_token_response(
+        monkeypatch,
+        {"token": "live-token-value", "token_type": "Bearer", "expires_dt": "20991231235959", "return_code": 0, "return_msg": "OK"},
+    )
+    manager = TokenManager()
+
+    token = asyncio.run(manager.get_access_token())
+
+    assert token == "live-token-value"
+    assert manager._access_token == "live-token-value"
+
+
+def test_au10001_access_token_fallback_is_accepted(monkeypatch):
+    configure_live_token_env(monkeypatch)
+    install_fake_token_response(
+        monkeypatch,
+        {"access_token": "legacy-token-value", "token_type": "Bearer", "expires_in": 3600, "return_code": 0, "return_msg": "OK"},
+    )
+    manager = TokenManager()
+
+    token = asyncio.run(manager.get_access_token())
+
+    assert token == "legacy-token-value"
+
+
+def test_au10001_return_code_error_is_safe(monkeypatch):
+    configure_live_token_env(monkeypatch)
+    install_fake_token_response(monkeypatch, {"return_code": "999", "return_msg": "denied"})
+    manager = TokenManager()
+
+    with pytest.raises(TokenManagerError) as exc_info:
+        asyncio.run(manager.get_access_token())
+
+    message = str(exc_info.value)
+    assert "return_code=999" in message
+    assert "denied" in message
+    assert "configured-app-key" not in message
+    assert "configured-secret" not in message
+    assert "configured-account" not in message
+    assert exc_info.value.return_code == "999"
+
+
+def test_au10001_missing_token_error_is_safe(monkeypatch):
+    configure_live_token_env(monkeypatch)
+    install_fake_token_response(monkeypatch, {"return_code": 0, "return_msg": "OK"})
+    manager = TokenManager()
+
+    with pytest.raises(TokenManagerError) as exc_info:
+        asyncio.run(manager.get_access_token())
+
+    message = str(exc_info.value)
+    assert "did not include token" in message
+    assert "configured-app-key" not in message
+    assert "configured-secret" not in message
+    assert "configured-account" not in message
+
+
 def test_live_verify_requires_explicit_confirm():
     with pytest.raises(LiveVerifyBlocked):
         validate_live_verify_environment(
@@ -199,6 +300,37 @@ def test_safe_response_output_does_not_print_sensitive_values(capsys):
     assert "token-visible-value" not in output
     assert "999999999" not in output
     assert "schema_keys" in output
+
+
+def test_safe_failure_output_handles_mapper_error_without_name_error(capsys):
+    from app.services.account_service import MapperValidationError
+
+    print_safe_failure("ka00001", MapperValidationError("ka00001", ["acctNo"]))
+
+    output = capsys.readouterr().out
+    assert "TR=ka00001" in output
+    assert "status=failed" in output
+    assert "error_type=MapperValidationError" in output
+    assert "acctNo" in output
+
+
+def test_safe_failure_output_handles_token_error_without_sensitive_values(capsys):
+    exc = TokenManagerError(
+        "safe failure",
+        http_status=200,
+        return_code="999",
+        return_msg="denied",
+    )
+
+    print_safe_failure("au10001", exc)
+
+    output = capsys.readouterr().out
+    assert "TR=au10001" in output
+    assert "status=failed" in output
+    assert "error_type=TokenManagerError" in output
+    assert "http_status=200" in output
+    assert "return_code=999" in output
+    assert "safe failure" not in output
 
 
 def test_supported_tr_specs_are_readonly_account_scope_only():

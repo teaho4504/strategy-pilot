@@ -132,3 +132,22 @@ The documentation baseline prepared the next implementation step.
 - The script prints schema keys, success/failure, and error type only.
 - It does not print live response values, account numbers, balances, stock names, stock codes, app keys, secrets, or tokens.
 - It stops on the first TR failure.
+
+## 2026-07-05: au10001 Token Handling Safety Fix Prepared
+
+### Reason
+
+- Local live read-only verification surfaced that the `au10001` token response may use Kiwoom's documented `token` field rather than only an `access_token` field.
+- The live verification failure printer also needed to avoid masking the original failure with a secondary exception.
+
+### Changes
+
+- Treat `token` as the primary `au10001` access token field.
+- Keep `access_token` only as a compatibility fallback.
+- Handle Kiwoom `return_code != 0` token responses as safe backend errors without logging raw response bodies.
+- Print verification failures as minimal fields: TR ID, status, error type, HTTP status when available, and return code when available.
+
+### Boundaries
+
+- No actual Kiwoom API call was made for this fix.
+- No order, WebSocket, Worker, AWS, Vercel, or frontend code was added.

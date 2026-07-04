@@ -73,6 +73,8 @@ Verification order:
 
 The script prints only mode, read-only/order-disabled state, success/failure, and schema key lists. It must not print tokens, app keys, secrets, account numbers, balances, stock names, or stock codes.
 
+For `au10001`, the backend accepts Kiwoom's `token` field as the access token and keeps `access_token` only as a compatibility fallback. If Kiwoom returns `return_code` other than `0`, the verifier prints only the TR ID, error type, HTTP status when available, and return code. It does not print the raw response body.
+
 Do not save raw live responses in Git. If temporary troubleshooting logs are absolutely necessary, keep them under `/tmp` or another Git-ignored local path and remove them after verification.
 
 ## Safety rules

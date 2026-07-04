@@ -67,10 +67,22 @@ def print_safe_step_result(api_id: str, body: dict[str, object]) -> None:
 
 
 def print_safe_failure(api_id: str, exc: Exception) -> None:
-    if isinstance(exc, MapperValidationError):
-        print(f"{api_id}: mapper_validation_error missing_fields={exc.missing_fields}")
+    missing_fields = getattr(exc, "missing_fields", None)
+    if missing_fields is not None:
+        print(f"TR={api_id}")
+        print("status=failed")
+        print(f"error_type={type(exc).__name__}")
+        print(f"missing_fields={missing_fields}")
         return
-    print(f"{api_id}: failed error_type={type(exc).__name__}")
+    print(f"TR={api_id}")
+    print("status=failed")
+    print(f"error_type={type(exc).__name__}")
+    http_status = getattr(exc, "http_status", None)
+    return_code = getattr(exc, "return_code", None)
+    if http_status is not None:
+        print(f"http_status={http_status}")
+    if return_code is not None:
+        print(f"return_code={return_code}")
 
 
 async def request_token_only() -> object:
