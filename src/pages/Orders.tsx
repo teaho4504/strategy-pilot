@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/common/Card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { orders as initial } from "@/services/mock/data";
+import { orderAdapter, queryKeys } from "@/services/adapters";
 import type { Order, OrderStatus } from "@/types";
 import { timeKR, won } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,9 +24,14 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 };
 
 export default function Orders() {
-  const [list, setList] = useState<Order[]>(initial);
+  const queryClient = useQueryClient();
+  const { data: list = [], isLoading } = useQuery({ queryKey: queryKeys.orders, queryFn: orderAdapter.list });
   const [tab, setTab] = useState<Tab>("pending");
   const [sel, setSel] = useState<Order | null>(null);
+  const cancelMutation = useMutation({
+    mutationFn: orderAdapter.cancel,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.orders }),
+  });
 
   const tabSpec = TABS.find((t) => t.key === tab)!;
   const filtered = useMemo(
@@ -34,7 +40,7 @@ export default function Orders() {
   );
 
   const cancel = (id: string) => {
-    setList((prev) => prev.map((o) => (o.id === id && o.status === "pending" ? { ...o, status: "cancelled" } : o)));
+    cancelMutation.mutate(id);
     toast.success("주문 취소 (데모)");
     setSel(null);
   };
@@ -69,7 +75,8 @@ export default function Orders() {
         </div>
 
         <div className="space-y-2">
-          {filtered.length === 0 && (
+          {isLoading && <Card className="text-center text-sm text-muted-foreground">주문 데이터 조회 중입니다.</Card>}
+          {!isLoading && filtered.length === 0 && (
             <Card className="text-center text-sm text-muted-foreground">표시할 주문이 없습니다.</Card>
           )}
           {filtered.map((o) => (
@@ -143,7 +150,7 @@ export default function Orders() {
                 </div>
 
                 {sel.status === "pending" ? (
-                  <Button variant="destructive" className="w-full" onClick={() => cancel(sel.id)}>
+                  <Button variant="destructive" className="w-full" onClick={() => cancel(sel.id)} disabled={cancelMutation.isPending}>
                     주문 취소 (데모)
                   </Button>
                 ) : (

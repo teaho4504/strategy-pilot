@@ -1,17 +1,50 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card, SectionTitle } from "@/components/common/Card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { riskSettings as initial } from "@/services/mock/data";
+import { portfolioAdapter, queryKeys, riskAdapter } from "@/services/adapters";
+import { getErrorMessage } from "@/services/apiClient";
 import { won } from "@/lib/format";
 import { Link2, ShieldCheck, ServerCog, Lock, Info } from "lucide-react";
 import { toast } from "sonner";
+import type { RiskSettings } from "@/types";
+
+const emptyRisk: RiskSettings = {
+  dailyLossLimit: 0,
+  perStrategyMaxInvest: 0,
+  perTickerMaxWeightPct: 0,
+  maxConcurrentTickers: 0,
+  maxOrdersPerDay: 0,
+  notify: { strategyError: false, orderFailure: false, dailyLossHit: false, bigPnl: false },
+};
 
 export default function Settings() {
-  const [r, setR] = useState(initial);
+  const queryClient = useQueryClient();
+  const { data: risk } = useQuery({ queryKey: queryKeys.risk, queryFn: riskAdapter.get });
+  const { data: health, isError: healthError, error: healthQueryError } = useQuery({
+    queryKey: queryKeys.health,
+    queryFn: portfolioAdapter.getHealth,
+    refetchInterval: 15_000,
+    retry: 1,
+  });
+  const [r, setR] = useState<RiskSettings>(emptyRisk);
+  const saveMutation = useMutation({
+    mutationFn: riskAdapter.update,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.risk }),
+  });
+
+  useEffect(() => {
+    if (risk) setR(risk);
+  }, [risk]);
+
+  const save = () => {
+    saveMutation.mutate(r);
+    toast.success("설정 저장됨 (데모)");
+  };
 
   return (
     <>
@@ -59,30 +92,34 @@ export default function Settings() {
                 </span>
                 <div>
                   <div className="text-sm font-semibold">키움증권</div>
-                  <div className="text-[11px] text-muted-foreground">OpenAPI · 연동 준비 중</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {health?.mode === "live" ? "REST API · 계좌 조회 모드" : "REST API · mock 모드"}
+                  </div>
                 </div>
               </div>
-              <span className="chip border-warning/40 bg-warning-soft text-warning">준비 중</span>
+              <span className={health?.kiwoom.configured ? "chip border-success/40 bg-success/10 text-success" : "chip border-warning/40 bg-warning-soft text-warning"}>
+                {health?.kiwoom.configured ? "설정 확인" : "설정 필요"}
+              </span>
             </div>
-            <Button variant="outline" className="mt-3 w-full" disabled>
-              연동 설정 열기 (출시 예정)
-            </Button>
+            <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+              App Key {health?.kiwoom.appKey ?? "미설정"} · 계좌 {health?.kiwoom.accountNo ?? "미설정"}
+            </div>
           </div>
           <div className="flex items-start gap-2 rounded-xl border border-border bg-muted/40 p-3 text-[12px] text-muted-foreground">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-            API 키 · 시크릿은 절대 프론트엔드에 저장되지 않습니다. 실제 주문 실행은 서버 측 워커에서만 수행되며, 대시보드는 내부 API로만 통신합니다.
+            API 키와 시크릿은 프론트엔드에 저장되지 않습니다. 실제 주문 실행은 서버 측 자동매매 엔진에서만 처리됩니다.
           </div>
         </Card>
 
         <Card className="space-y-3">
-          <SectionTitle title="서버 상태" />
-          <Row icon={<ServerCog className="h-4 w-4" />} label="시세 어댑터" value="정상 (데모)" tone="ok" />
-          <Row icon={<ServerCog className="h-4 w-4" />} label="주문 워커" value="연결됨 (데모)" tone="ok" />
-          <Row icon={<ServerCog className="h-4 w-4" />} label="데이터 동기화" value="3초 전" tone="ok" />
-          <Row icon={<Info className="h-4 w-4" />} label="앱 버전" value="0.1.0 · prototype" />
+          <SectionTitle title="서버 상태" sub={healthError ? `API 오류 · ${getErrorMessage(healthQueryError)}` : undefined} />
+          <Row icon={<ServerCog className="h-4 w-4" />} label="백엔드" value={health?.status ?? "연결 대기"} tone={health?.status === "ok" ? "ok" : undefined} />
+          <Row icon={<ServerCog className="h-4 w-4" />} label="키움 모드" value={health?.mode ?? "unknown"} tone={health?.mode === "mock" || health?.mode === "live" ? "ok" : undefined} />
+          <Row icon={<ServerCog className="h-4 w-4" />} label="마지막 정상 조회" value={health?.lastSuccessAt ? new Date(health.lastSuccessAt).toLocaleTimeString("ko-KR") : "없음"} />
+          <Row icon={<Info className="h-4 w-4" />} label="앱 버전" value="prototype" />
         </Card>
 
-        <Button className="w-full" onClick={() => toast.success("설정 저장됨 (데모)")}>
+        <Button className="w-full" onClick={save} disabled={saveMutation.isPending}>
           설정 저장
         </Button>
 
@@ -103,7 +140,7 @@ function Field({ label, value, onChange, suffix, hint }: {
       <div className="relative">
         <Input
           inputMode="numeric"
-          value={value.toString()}
+          value={value.toLocaleString("ko-KR")}
           onChange={(e) => onChange(Number(e.target.value.replace(/[^\d]/g, "")) || 0)}
           className="h-11 pr-12 text-right num text-base"
         />

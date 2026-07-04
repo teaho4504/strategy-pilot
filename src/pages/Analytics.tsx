@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card, SectionTitle } from "@/components/common/Card";
-import { analytics } from "@/services/mock/data";
+import { analyticsAdapter, queryKeys } from "@/services/adapters";
 import { won } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -17,7 +18,19 @@ const RANGES = [
 
 export default function Analytics() {
   const [range, setRange] = useState<(typeof RANGES)[number]["k"]>("7d");
-  const a = analytics;
+  const { data: a, isLoading } = useQuery({ queryKey: queryKeys.analytics(range), queryFn: () => analyticsAdapter.summary(range) });
+
+  if (!a) {
+    return (
+      <>
+        <TopBar />
+        <main className="space-y-3 p-4 animate-fade-in">
+          <h1 className="text-xl font-semibold">분석</h1>
+          <Card className="text-center text-sm text-muted-foreground">{isLoading ? "분석 데이터 조회 중입니다." : "분석 데이터가 없습니다."}</Card>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

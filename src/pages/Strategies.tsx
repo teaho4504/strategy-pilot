@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Plus, Pause, Play, ChevronRight } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/common/Card";
 import { StatusBadge } from "@/components/common/DemoBadge";
 import { DeltaPct } from "@/components/common/DeltaPct";
-import { strategies as initial } from "@/services/mock/data";
+import { queryKeys, strategyAdapter } from "@/services/adapters";
 import { won, relTime } from "@/lib/format";
 import type { Strategy, StrategyStatus } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -21,23 +22,28 @@ const TABS: { key: "all" | StrategyStatus; label: string }[] = [
 ];
 
 export default function Strategies() {
-  const [list, setList] = useState<Strategy[]>(initial);
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("all");
+  const { data: list = [], isLoading } = useQuery({ queryKey: queryKeys.strategies, queryFn: strategyAdapter.list });
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, next }: { id: string; next: Strategy["status"] }) => strategyAdapter.toggle(id, next),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.strategies }),
+  });
 
   const filtered = useMemo(
     () => (tab === "all" ? list : list.filter((s) => s.status === tab)),
     [list, tab]
   );
 
-  const toggle = (id: string) => {
-    setList((prev) =>
-      prev.map((s) => {
-        if (s.id !== id) return s;
-        if (s.status === "running") { toast.message(`${s.name} 일시정지 (데모)`); return { ...s, status: "paused" }; }
-        if (s.status === "paused" || s.status === "idle") { toast.success(`${s.name} 시작 (데모)`); return { ...s, status: "running" }; }
-        toast.error(`${s.name}: 오류 상태입니다. 설정에서 점검 필요`); return s;
-      })
-    );
+  const toggle = (strategy: Strategy) => {
+    if (strategy.status === "error") {
+      toast.error(`${strategy.name}: 오류 상태입니다. 설정에서 점검 필요`);
+      return;
+    }
+    const next = strategy.status === "running" ? "paused" : "running";
+    toggleMutation.mutate({ id: strategy.id, next });
+    if (next === "paused") toast.message(`${strategy.name} 일시정지 (데모)`);
+    else toast.success(`${strategy.name} 시작 (데모)`);
   };
 
   return (
@@ -77,7 +83,8 @@ export default function Strategies() {
         </div>
 
         <div className="space-y-3">
-          {filtered.length === 0 && (
+          {isLoading && <Card className="text-center text-sm text-muted-foreground">전략 데이터 조회 중입니다.</Card>}
+          {!isLoading && filtered.length === 0 && (
             <Card className="text-center text-sm text-muted-foreground">조건에 해당하는 전략이 없습니다.</Card>
           )}
           {filtered.map((s) => (
@@ -111,7 +118,8 @@ export default function Strategies() {
               <Button
                 variant={s.status === "running" ? "secondary" : "default"}
                 className="w-full"
-                onClick={() => toggle(s.id)}
+                onClick={() => toggle(s)}
+                disabled={toggleMutation.isPending}
               >
                 {s.status === "running" ? <><Pause className="mr-1.5 h-4 w-4" /> 일시정지</> : <><Play className="mr-1.5 h-4 w-4" /> 시작</>}
               </Button>
