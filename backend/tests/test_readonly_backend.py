@@ -15,6 +15,8 @@ from app.services.account_service import (
     map_holdings_response,
     map_performance_response,
     map_portfolio_response,
+    parse_float,
+    parse_int,
 )
 from app.services.kiwoom_client import KiwoomConfigurationError, KiwoomResponse, TR_SPECS
 from app.services.token_manager import TOKEN_PATH, TOKEN_REQUEST_BODY_KEYS, TokenManager, TokenManagerError, token_manager
@@ -533,6 +535,11 @@ def test_kt00001_cash_mapper():
     assert cash.orderableAmount == 12_550_000
 
 
+def test_kt00001_cash_mapper_uses_live_ord_alowa_fallback():
+    cash = map_cash_response({"entr": "18420000", "pymn_alow_amt": "11230000", "ord_alowa": "12550000"})
+    assert cash.orderableAmount == 12_550_000
+
+
 def test_kt00004_portfolio_mapper():
     portfolio = map_portfolio_response(
         {"aset_evlt_amt": "52184300", "tdy_lspft": "312500", "tdy_lspft_rt": "0.61", "lspft": "2184300"},
@@ -543,6 +550,17 @@ def test_kt00004_portfolio_mapper():
     assert portfolio.dayPnl == 312_500
     assert portfolio.dayPnlPct == 0.61
     assert portfolio.cumulativePnl == 2_184_300
+
+
+def test_kt00004_portfolio_mapper_uses_live_amount_fallbacks():
+    portfolio = map_portfolio_response(
+        {"prsm_dpst_aset_amt": "52,184,300", "tdy_lspft_amt": "+312,500", "lspft_amt": "-2,184,300", "lspft_ratio": "0.61"},
+        cash=18_420_000,
+    )
+    assert portfolio.equity == 52_184_300
+    assert portfolio.dayPnl == 312_500
+    assert portfolio.cumulativePnl == -2_184_300
+    assert portfolio.dayPnlPct == 0.61
 
 
 def test_kt00005_holdings_mapper():
@@ -558,6 +576,10 @@ def test_kt00005_holdings_mapper():
     assert holdings[1].profitLoss == 13_200
 
 
+def test_kt00005_holdings_mapper_allows_empty_live_list():
+    assert map_holdings_response([]) == []
+
+
 def test_ka10085_performance_mapper():
     performance = map_performance_response(
         [
@@ -569,6 +591,40 @@ def test_ka10085_performance_mapper():
     assert performance.totalPurchaseAmount == 2_207_800
     assert performance.totalValuationAmount == 2_230_000
     assert performance.totalProfitLoss == 22_200
+
+
+def test_parse_number_helpers_handle_sign_commas_and_blanks():
+    assert parse_int("+1,234") == 1234
+    assert parse_int("-1,234") == -1234
+    assert parse_int("") == 0
+    assert parse_float("+1.25") == 1.25
+    assert parse_float("") == 0.0
+
+
+def test_kiwoom_mock_responses_match_mapper_shapes():
+    client = kiwoom_module.KiwoomClient()
+    account = client._mock_response("ka00001")
+    cash = client._mock_response("kt00001")
+    portfolio = client._mock_response("kt00004")
+    holdings = client._mock_response("kt00005")
+    performance = client._mock_response("ka10085")
+
+    assert map_account_response(account).maskedNumber == "configured"
+    assert map_cash_response(cash).cash == 18_420_000
+    assert map_portfolio_response(portfolio, cash=18_420_000).equity == 52_184_300
+    assert len(map_holdings_response(holdings["stk_cntr_remn"])) == 1
+    assert len(map_performance_response(performance["acnt_prft_rt"]).items) == 2
+
+
+def test_mapper_validation_error_does_not_include_sensitive_values():
+    with pytest.raises(ValueError) as exc_info:
+        map_holdings_response([{"stk_cd": "1234567890", "stk_nm": "SENSITIVE NAME"}])
+
+    message = str(exc_info.value)
+    assert "cur_prc" in message
+    assert "evlt_amt" in message
+    assert "1234567890" not in message
+    assert "SENSITIVE NAME" not in message
 
 
 def test_continuation_query_merges_list_items(monkeypatch):

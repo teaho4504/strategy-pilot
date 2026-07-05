@@ -90,15 +90,16 @@ def map_portfolio_response(
     source: str = "kiwoom-live-readonly-kt00004",
 ) -> Portfolio:
     _require_one_of("kt00004", body, ["aset_evlt_amt", "prsm_dpst_aset_amt"])
-    _require_fields("kt00004", body, ["tdy_lspft", "lspft"])
+    _require_one_of("kt00004", body, ["tdy_lspft", "tdy_lspft_amt"])
+    _require_one_of("kt00004", body, ["lspft", "lspft_amt", "lspft2"])
     equity = parse_int(body.get("aset_evlt_amt") or body.get("prsm_dpst_aset_amt"))
-    day_pnl = parse_int(body.get("tdy_lspft"))
-    cumulative_pnl = parse_int(body.get("lspft"))
+    day_pnl = parse_int(body.get("tdy_lspft") or body.get("tdy_lspft_amt"))
+    cumulative_pnl = parse_int(body.get("lspft") or body.get("lspft_amt") or body.get("lspft2"))
     return Portfolio(
         equity=equity,
         cash=cash,
         dayPnl=day_pnl,
-        dayPnlPct=parse_float(body.get("tdy_lspft_rt")),
+        dayPnlPct=parse_float(body.get("tdy_lspft_rt") or body.get("lspft_ratio") or body.get("lspft_rt")),
         cumulativePnl=cumulative_pnl,
         cashRatio=round(cash / equity, 4) if equity else 0.0,
         intradayCurve=mock_portfolio().intradayCurve,

@@ -214,3 +214,23 @@ The documentation baseline prepared the next implementation step.
 
 - No actual Kiwoom API call was made for this fix.
 - No frontend, AWS, Vercel, Docker, order, WebSocket, or Worker code was changed.
+
+## 2026-07-05: Phase 1 Live Read-only Validation Passed And Mapper Refinement Started
+
+### Facts
+
+- Local live read-only verification passed from `au10001` through `ka10085`.
+- The verification output included only schema key names and safe status fields.
+- No token, account number, cash balance, holding name, holding symbol, or raw JSON response was stored in the repository.
+
+### Mapper Refinement
+
+- `kt00004` portfolio mapping now accepts live amount suffix fallbacks such as `tdy_lspft_amt` and `lspft_amt`.
+- Kiwoom client mock responses were adjusted toward Kiwoom-like read-only TR schema keys.
+- Regression tests now cover live-style mapper fallbacks, numeric string parsing, empty holdings lists, and secret-safe validation errors.
+
+### Boundaries
+
+- No actual Kiwoom API call was made during mapper refinement.
+- No API response contract breaking change was introduced.
+- No frontend, AWS, Vercel, Docker, order, WebSocket, or Worker code was changed.

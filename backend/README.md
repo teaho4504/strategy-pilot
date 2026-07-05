@@ -6,6 +6,7 @@ FastAPI read-only backend for account and dashboard data.
 
 - Implemented: mock mode HTTP APIs for account, cash, portfolio, holdings, performance, and watchlist.
 - Implemented: server-side Kiwoom REST adapter structure for `au10001`, `ka00001`, `kt00001`, `kt00004`, `kt00005`, and `ka10085`.
+- Verified: local live read-only verification passed from `au10001` through `ka10085`; mapper refinement remains backend-only and fixture-based.
 - Not implemented: order placement, order amendment, order cancellation, WebSocket realtime ingestion, worker processes, and live trading.
 
 Default mode is always `KIWOOM_MODE=mock`.

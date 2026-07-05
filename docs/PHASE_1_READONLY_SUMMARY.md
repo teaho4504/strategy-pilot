@@ -1,6 +1,6 @@
 # Phase 1 Read-only Backend Summary
 
-Current status: Phase 1 implementation complete, live validation pending.
+Current status: Phase 1 read-only backend complete, live validation passed.
 
 This document summarizes why the Phase 1 FastAPI read-only backend was created, what it currently supports, what remains intentionally excluded, and what must happen before the project can move toward frontend integration or live trading design.
 
@@ -89,17 +89,24 @@ These TRs were selected because they cover the current dashboard's account state
 - Missing live credentials returning a configuration error.
 - Token failure returning a backend error without leaking secrets.
 - Mapper tests for `ka00001`, `kt00001`, `kt00004`, `kt00005`, and `ka10085` fixture shapes.
+- Mapper regression tests for live-response field fallbacks, numeric string parsing, empty holdings lists, and secret-safe validation errors.
 - Continuation query handling for `cont-yn=Y` and `next-key`.
 - Local live verification guard checks.
+- Local live read-only verification passed from `au10001` through `ka10085` without printing token, account number, cash balance, holdings values, or raw JSON.
 - `python3 -m compileall backend/app backend/scripts`.
-- 17 pytest tests.
+- Backend pytest suite.
 
-### Prepared But Not Live-verified
+### Prepared And Live-verified
 
 - `au10001` token issue against actual Kiwoom infrastructure.
 - `ka00001`, `kt00001`, `kt00004`, `kt00005`, and `ka10085` live read-only execution.
-- Actual Kiwoom response field validation against live account responses.
-- Mapper corrections based on real live schemas.
+- Top-level live response schema key validation by the verification script.
+
+### Mapper Refinement Completed
+
+- Live-response key review and fixture-based mapper regression coverage are complete for the Phase 1 backend scope.
+- Any future nested row-level field differences found during endpoint-level frontend integration should be handled as follow-up mapper fixes.
+- Frontend adapter integration remains a separate next step against the stable backend API contract.
 
 ### Not Implemented
 
@@ -116,7 +123,6 @@ These TRs were selected because they cover the current dashboard's account state
 
 The following are not part of Phase 1:
 
-- Actual live Kiwoom TR execution result verification.
 - Frontend adapter integration.
 - Vercel backend URL connection.
 - AWS deployment.
@@ -133,9 +139,9 @@ The following are not part of Phase 1:
 
 Phase 1 should only be marked fully complete after all of the following are true:
 
-1. Local live read-only verification runs from `au10001` through `ka10085`.
-2. Actual Kiwoom response fields are validated against mapper expectations.
-3. Any mapper corrections from live response schemas are completed.
+1. Local live read-only verification runs from `au10001` through `ka10085`. Completed.
+2. Actual Kiwoom response fields are validated against mapper expectations. Completed for the Phase 1 live read-only verification scope.
+3. Mapper corrections from live response schemas are completed for the Phase 1 backend scope.
 4. No secret leakage is confirmed in status APIs, script output, logs, and committed files.
 5. Backend work is committed and pushed to the remote branch.
 
@@ -144,10 +150,8 @@ Frontend adapter integration is not required for backend Phase 1 completion. It 
 ## 9. Next Steps
 
 1. Keep the backend commit pushed on `feature/fastapi-readonly-account`.
-2. Run local live read-only verification manually with backend-only environment variables.
-3. Correct mappers if actual response schemas differ from fixtures.
-4. Create a separate frontend adapter integration task after read-only live validation passes.
+2. Create a separate frontend adapter integration task after read-only mapper refinement passes.
 5. Plan AWS FastAPI deployment and Vercel API URL connection only after the backend API contract is validated.
 6. Defer realtime gateway, workers, paper trading, and live order design to later risk-controlled phases.
 
-Do not describe the current state as Phase 1 fully complete or live account integration complete. The accurate status is: Phase 1 implementation complete, live validation pending.
+Do not describe the current state as live trading integration complete. The accurate status is: Phase 1 read-only backend complete, live validation passed.

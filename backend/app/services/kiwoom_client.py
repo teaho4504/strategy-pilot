@@ -6,7 +6,6 @@ from typing import Any, Optional
 import httpx
 
 from app.core.config import get_settings
-from app.services.mock_data import mock_performance
 from app.services.token_manager import TokenManagerError, token_manager
 
 
@@ -134,14 +133,36 @@ class KiwoomClient:
             return {"acctNo": "MOCK_ACCOUNT", "return_code": 0, "return_msg": "mock"}
         if api_id == "ka10085":
             return {
-                "acnt_prft_rt": [item.model_dump() for item in mock_performance().items],
+                "acnt_prft_rt": [
+                    {"stk_cd": "000001", "stk_nm": "MOCK HOLDING 1", "rmnd_qty": "10", "pur_pric": "10000", "cur_prc": "10500", "pur_amt": "100000"},
+                    {"stk_cd": "000002", "stk_nm": "MOCK HOLDING 2", "rmnd_qty": "5", "pur_pric": "20000", "cur_prc": "19800", "pur_amt": "100000"},
+                ],
                 "return_code": 0,
                 "return_msg": "mock",
             }
         if api_id == "kt00001":
-            return {"entr": "18420000", "ord_alow_amt": "12550000", "return_code": 0, "return_msg": "mock"}
-        if api_id in {"kt00004", "kt00005"}:
-            return {"return_code": 0, "return_msg": "mock"}
+            return {"entr": "18420000", "pymn_alow_amt": "11230000", "ord_alow_amt": "12550000", "return_code": 0, "return_msg": "mock"}
+        if api_id == "kt00004":
+            return {
+                "aset_evlt_amt": "52184300",
+                "tdy_lspft_amt": "312500",
+                "tdy_lspft_rt": "0.61",
+                "lspft_amt": "2184300",
+                "stk_acnt_evlt_prst": [],
+                "return_code": 0,
+                "return_msg": "mock",
+            }
+        if api_id == "kt00005":
+            return {
+                "entr": "18420000",
+                "pymn_alow_amt": "11230000",
+                "ord_alowa": "12550000",
+                "stk_cntr_remn": [
+                    {"stk_cd": "000001", "stk_nm": "MOCK HOLDING 1", "cur_qty": "10", "buy_uv": "10000", "cur_prc": "10500", "evlt_amt": "105000", "evltv_prft": "5000", "pl_rt": "5.0"}
+                ],
+                "return_code": 0,
+                "return_msg": "mock",
+            }
         return {"return_code": 0, "return_msg": "mock"}
 
 
