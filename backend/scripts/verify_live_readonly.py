@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
@@ -79,10 +80,21 @@ def print_safe_failure(api_id: str, exc: Exception) -> None:
     print(f"error_type={type(exc).__name__}")
     http_status = getattr(exc, "http_status", None)
     return_code = getattr(exc, "return_code", None)
+    return_msg = sanitize_return_msg(getattr(exc, "return_msg", None))
     if http_status is not None:
         print(f"http_status={http_status}")
     if return_code is not None:
         print(f"return_code={return_code}")
+    if return_msg:
+        print(f"return_msg={return_msg}")
+
+
+def sanitize_return_msg(value: object) -> str:
+    if value is None:
+        return ""
+    message = str(value).replace("\n", " ").replace("\r", " ")
+    message = re.sub(r"[A-Za-z0-9_\-]{20,}", "[redacted]", message)
+    return message[:160]
 
 
 def print_token_request_diagnostics() -> None:
@@ -93,9 +105,12 @@ def print_token_request_diagnostics() -> None:
     for key in (
         "method",
         "base_url_present",
+        "url_expected_match",
         "path",
-        "api_id_present",
-        "api_id_expected_match",
+        "api_id_header_present",
+        "header_names",
+        "content_type_expected_match",
+        "request_body_keys",
         "appkey_present",
         "secretkey_present",
         "authorization_header_present",

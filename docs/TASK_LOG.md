@@ -162,7 +162,7 @@ The documentation baseline prepared the next implementation step.
 ### Changes
 
 - Centralized the token API ID as `au10001` and the token path as `/oauth2/token`.
-- Validate token request path and `api-id` header before issuing the token HTTP request.
+- Validate token request path before issuing the token HTTP request. The earlier `api-id` token header assumption was later superseded by the official OAuth example.
 - Treat blank `KIWOOM_TOKEN_URL` as unset and fall back to `KIWOOM_BASE_URL + /oauth2/token`.
 - Add safe token request diagnostics that show only method, path, boolean configuration presence, and API ID match state.
 
@@ -170,3 +170,47 @@ The documentation baseline prepared the next implementation step.
 
 - No actual Kiwoom API call was made for this diagnostic fix.
 - No raw request body, raw response body, app key, secret key, token, or account number is logged.
+
+## 2026-07-05: au10001 Wire Request Diagnostics Prepared
+
+### Reason
+
+- `return_code=3` persisted after IP allowlist changes and after confirming the configured token path and API ID.
+- The next diagnostic needed to verify the exact request structure passed to `httpx`, not just high-level settings.
+
+### Changes
+
+- Build the OAuth request in one place before passing it to `httpx.AsyncClient.post`.
+- Initially tested `api-id: au10001` with `Content-Type: application/json;charset=UTF-8` in the token request headers; this was later superseded by the official OAuth example, which omits `api-id`.
+- Validate token request body keys as `grant_type`, `appkey`, and `secretkey`.
+- Print safe wire diagnostics: URL path, wire API ID, header names, body key names, and boolean presence/match checks.
+- Print sanitized `return_msg` when available without raw JSON or credential values.
+
+### Authorization Header Decision
+
+- The token issuance request still does not send an `Authorization` header.
+- No empty Bearer token is added by guesswork; this requires official Kiwoom confirmation before changing.
+
+### Boundaries
+
+- No actual Kiwoom API call was made for this fix.
+- No frontend, AWS, Vercel, Docker, order, WebSocket, or Worker code was changed.
+
+## 2026-07-05: au10001 OAuth Header Contract Corrected
+
+### Reason
+
+- The official Kiwoom OAuth access-token Python example shows `au10001` token issuance without an `api-id` header.
+- The previous diagnostic request included `api-id: au10001`, which likely caused Kiwoom `return_code=3` for a token request.
+
+### Changes
+
+- Token issuance now sends only `Content-Type: application/json;charset=UTF-8` as the OAuth request header.
+- Token issuance explicitly rejects `api-id` and `Authorization` headers.
+- Token issuance still validates body keys as `grant_type`, `appkey`, and `secretkey`.
+- Regular account TR calls continue to send `api-id`, `Authorization: Bearer {token}`, `cont-yn`, and `next-key`.
+
+### Boundaries
+
+- No actual Kiwoom API call was made for this fix.
+- No frontend, AWS, Vercel, Docker, order, WebSocket, or Worker code was changed.

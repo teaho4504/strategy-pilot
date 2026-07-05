@@ -9,8 +9,8 @@ import httpx
 from app.core.config import get_settings
 
 
-TOKEN_API_ID = "au10001"
 TOKEN_PATH = "/oauth2/token"
+TOKEN_REQUEST_BODY_KEYS = ("grant_type", "appkey", "secretkey")
 
 
 class TokenManagerError(RuntimeError):
@@ -18,7 +18,7 @@ class TokenManagerError(RuntimeError):
         self,
         message: str,
         *,
-        api_id: str = TOKEN_API_ID,
+        api_id: str = "au10001",
         http_status: Optional[int] = None,
         return_code: Optional[object] = None,
         return_msg: Optional[object] = None,
@@ -51,16 +51,10 @@ class TokenManager:
 
     async def refresh_access_token(self) -> None:
         settings = get_settings()
-        payload = {
-            "grant_type": "client_credentials",
-            "appkey": settings.kiwoom_app_key,
-            "secretkey": settings.kiwoom_secret_key,
-        }
-        headers = self._token_request_headers()
-        self._validate_token_request(settings.token_url, headers)
+        request = self._build_token_request(settings.token_url, settings.kiwoom_app_key, settings.kiwoom_secret_key)
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.post(settings.token_url, json=payload, headers=headers)
+                response = await client.post(request["url"], json=request["json"], headers=request["headers"])
                 data: dict[str, Any] = response.json()
                 self._raise_for_token_api_error(response.status_code, data)
                 response.raise_for_status()
@@ -81,33 +75,52 @@ class TokenManager:
         self._expires_at = self._parse_expires_at(data)
 
     @staticmethod
-    def _token_request_headers(api_id: str = TOKEN_API_ID) -> dict[str, str]:
-        if api_id != TOKEN_API_ID:
-            raise TokenManagerError("Kiwoom token request API ID is invalid")
-        return {"api-id": TOKEN_API_ID}
+    def _build_token_request(token_url: str, app_key: str, secret_key: str) -> dict[str, object]:
+        headers = TokenManager._token_request_headers()
+        payload = {
+            "grant_type": "client_credentials",
+            "appkey": app_key,
+            "secretkey": secret_key,
+        }
+        TokenManager._validate_token_request(token_url, headers, payload)
+        return {"url": token_url, "headers": headers, "json": payload}
 
     @staticmethod
-    def _validate_token_request(token_url: str, headers: dict[str, str]) -> None:
+    def _token_request_headers() -> dict[str, str]:
+        return {"Content-Type": "application/json;charset=UTF-8"}
+
+    @staticmethod
+    def _validate_token_request(token_url: str, headers: dict[str, str], payload: Optional[dict[str, object]] = None) -> None:
         parsed = urlparse(token_url)
         if parsed.path != TOKEN_PATH:
             raise TokenManagerError("Kiwoom token URL path is invalid")
-        if headers.get("api-id") != TOKEN_API_ID:
-            raise TokenManagerError("Kiwoom token request API ID is invalid")
+        header_names = {str(key).lower() for key in headers.keys()}
+        if "api-id" in header_names:
+            raise TokenManagerError("Kiwoom token request must not include api-id header")
+        if "authorization" in header_names:
+            raise TokenManagerError("Kiwoom token request must not include authorization header")
+        if payload is not None and tuple(payload.keys()) != TOKEN_REQUEST_BODY_KEYS:
+            raise TokenManagerError("Kiwoom token request body keys are invalid")
 
     @staticmethod
     def token_request_diagnostics() -> dict[str, object]:
         settings = get_settings()
-        headers = TokenManager._token_request_headers()
-        parsed = urlparse(settings.token_url)
+        request = TokenManager._build_token_request(settings.token_url, settings.kiwoom_app_key, settings.kiwoom_secret_key)
+        headers = request["headers"]
+        payload = request["json"]
+        parsed = urlparse(str(request["url"]))
         return {
             "method": "POST",
             "base_url_present": bool(parsed.scheme and parsed.netloc),
+            "url_expected_match": str(request["url"]) == "https://api.kiwoom.com/oauth2/token",
             "path": parsed.path,
-            "api_id_present": bool(headers.get("api-id")),
-            "api_id_expected_match": headers.get("api-id") == TOKEN_API_ID,
+            "api_id_header_present": "api-id" in {str(key).lower() for key in headers.keys()},
+            "header_names": sorted(str(key).lower() for key in headers.keys()),
+            "content_type_expected_match": headers.get("Content-Type") == "application/json;charset=UTF-8",
+            "request_body_keys": list(payload.keys()),
             "appkey_present": bool(settings.kiwoom_app_key),
             "secretkey_present": bool(settings.kiwoom_secret_key),
-            "authorization_header_present": False,
+            "authorization_header_present": "authorization" in {str(key).lower() for key in headers.keys()},
         }
 
     @staticmethod

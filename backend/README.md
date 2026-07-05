@@ -75,7 +75,9 @@ The script prints only mode, read-only/order-disabled state, success/failure, an
 
 For `au10001`, the backend accepts Kiwoom's `token` field as the access token and keeps `access_token` only as a compatibility fallback. If Kiwoom returns `return_code` other than `0`, the verifier prints only the TR ID, error type, HTTP status when available, and return code. It does not print the raw response body.
 
-Before requesting `au10001`, the verifier prints a safe request summary: method, URL path, whether the `api-id` header is present and matches `au10001`, and whether app key/secret values are present. It does not print the app key, secret key, token, account number, raw request body, or raw response body. If `KIWOOM_TOKEN_URL` is blank, the backend falls back to `https://api.kiwoom.com/oauth2/token` from `KIWOOM_BASE_URL`.
+Before requesting `au10001`, the verifier prints a safe request summary: method, URL path, whether the `api-id` header is absent, header names, body key names, content type match state, and whether app key/secret values are present. It does not print the app key, secret key, token, account number, raw request body, or raw response body. If `KIWOOM_TOKEN_URL` is blank, the backend falls back to `https://api.kiwoom.com/oauth2/token` from `KIWOOM_BASE_URL`.
+
+The token issuance request does not send `api-id`, `Authorization`, `cont-yn`, or `next-key` headers. Those headers are used only for regular account TR calls after a token has been issued.
 
 Do not save raw live responses in Git. If temporary troubleshooting logs are absolutely necessary, keep them under `/tmp` or another Git-ignored local path and remove them after verification.
 

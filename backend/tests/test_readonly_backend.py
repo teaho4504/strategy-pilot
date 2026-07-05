@@ -17,12 +17,13 @@ from app.services.account_service import (
     map_portfolio_response,
 )
 from app.services.kiwoom_client import KiwoomConfigurationError, KiwoomResponse, TR_SPECS
-from app.services.token_manager import TOKEN_API_ID, TOKEN_PATH, TokenManager, TokenManagerError, token_manager
+from app.services.token_manager import TOKEN_PATH, TOKEN_REQUEST_BODY_KEYS, TokenManager, TokenManagerError, token_manager
 from scripts.verify_live_readonly import (
     CONFIRM_VALUE,
     LiveVerifyBlocked,
     load_backend_env_file,
     print_token_request_diagnostics,
+    sanitize_return_msg,
     print_safe_failure,
     print_safe_step_result,
     validate_live_verify_environment,
@@ -152,6 +153,32 @@ class FakeTokenClient:
         return self.response
 
 
+class CapturingTokenClient(FakeTokenClient):
+    def __init__(self, response, capture):
+        super().__init__(response)
+        self.capture = capture
+
+    async def post(self, *args, **kwargs):
+        self.capture["args"] = args
+        self.capture["kwargs"] = kwargs
+        return self.response
+
+
+class FakeTrResponse(FakeTokenResponse):
+    headers = {"cont-yn": "N", "next-key": ""}
+
+
+class CapturingTrClient(FakeTokenClient):
+    def __init__(self, response, capture):
+        super().__init__(response)
+        self.capture = capture
+
+    async def post(self, *args, **kwargs):
+        self.capture["args"] = args
+        self.capture["kwargs"] = kwargs
+        return self.response
+
+
 def configure_live_token_env(monkeypatch):
     monkeypatch.setenv("KIWOOM_MODE", "live")
     monkeypatch.setenv("KIWOOM_APP_KEY", "configured-app-key")
@@ -187,19 +214,63 @@ def test_blank_token_url_falls_back_to_default(monkeypatch):
     assert settings.token_url == "https://api.kiwoom.com/oauth2/token"
 
 
-def test_token_request_header_uses_official_api_id():
-    assert TokenManager._token_request_headers() == {"api-id": TOKEN_API_ID}
-    assert TOKEN_API_ID == "au10001"
+def test_token_request_header_uses_oauth_only_content_type():
+    assert TokenManager._token_request_headers() == {"Content-Type": "application/json;charset=UTF-8"}
 
 
-def test_token_request_rejects_wrong_api_id():
+def test_token_request_rejects_api_id_header():
     with pytest.raises(TokenManagerError):
-        TokenManager._token_request_headers("api-id")
+        TokenManager._validate_token_request("https://api.kiwoom.com/oauth2/token", {"api-id": "au10001"})
+
+
+def test_token_request_rejects_authorization_header():
+    with pytest.raises(TokenManagerError):
+        TokenManager._validate_token_request("https://api.kiwoom.com/oauth2/token", {"Authorization": "Bearer token"})
 
 
 def test_token_request_rejects_wrong_path():
     with pytest.raises(TokenManagerError):
-        TokenManager._validate_token_request("https://api.kiwoom.com/api/dostk/acnt", {"api-id": TOKEN_API_ID})
+        TokenManager._validate_token_request("https://api.kiwoom.com/api/dostk/acnt", {"Content-Type": "application/json;charset=UTF-8"})
+
+
+def test_token_request_rejects_wrong_body_keys():
+    with pytest.raises(TokenManagerError):
+        TokenManager._validate_token_request(
+            "https://api.kiwoom.com/oauth2/token",
+            {"Content-Type": "application/json;charset=UTF-8"},
+            {"grant_type": "client_credentials", "app_key": "wrong", "secretkey": "secret"},
+        )
+
+
+def test_token_request_wire_summary_uses_exact_url_headers_and_body_keys():
+    request = TokenManager._build_token_request(
+        "https://api.kiwoom.com/oauth2/token",
+        "visible-app-key",
+        "visible-secret-key",
+    )
+
+    assert request["url"] == "https://api.kiwoom.com/oauth2/token"
+    assert request["headers"] == {"Content-Type": "application/json;charset=UTF-8"}
+    assert tuple(request["json"].keys()) == TOKEN_REQUEST_BODY_KEYS
+    assert "visible-app-key" in request["json"].values()
+    assert "visible-secret-key" in request["json"].values()
+
+
+def test_refresh_access_token_passes_expected_wire_request(monkeypatch):
+    configure_live_token_env(monkeypatch)
+    capture = {}
+    response = FakeTokenResponse({"token": "live-token-value", "expires_in": 3600, "return_code": 0, "return_msg": "OK"})
+    monkeypatch.setattr(
+        "app.services.token_manager.httpx.AsyncClient",
+        lambda timeout=10: CapturingTokenClient(response, capture),
+    )
+    manager = TokenManager()
+
+    asyncio.run(manager.refresh_access_token())
+
+    assert capture["args"] == ("https://api.kiwoom.com/oauth2/token",)
+    assert capture["kwargs"]["headers"] == {"Content-Type": "application/json;charset=UTF-8"}
+    assert tuple(capture["kwargs"]["json"].keys()) == TOKEN_REQUEST_BODY_KEYS
 
 
 def test_token_request_diagnostics_are_safe(monkeypatch, capsys):
@@ -215,13 +286,52 @@ def test_token_request_diagnostics_are_safe(monkeypatch, capsys):
 
     output = capsys.readouterr().out
     assert diagnostics["path"] == TOKEN_PATH
-    assert diagnostics["api_id_expected_match"] is True
+    assert diagnostics["url_expected_match"] is True
+    assert diagnostics["api_id_header_present"] is False
+    assert diagnostics["header_names"] == ["content-type"]
+    assert diagnostics["content_type_expected_match"] is True
+    assert diagnostics["request_body_keys"] == ["grant_type", "appkey", "secretkey"]
+    assert diagnostics["authorization_header_present"] is False
     assert "visible-app-key" not in output
     assert "visible-secret-key" not in output
     assert "1234567890" not in output
+    assert "api_id_header_present=False" in output
+    assert "request_body_keys=['grant_type', 'appkey', 'secretkey']" in output
     assert "appkey_present=True" in output
     assert "secretkey_present=True" in output
-    assert "api_id_expected_match=True" in output
+    assert "content_type_expected_match=True" in output
+
+
+def test_return_msg_sanitizer_redacts_long_tokens():
+    assert sanitize_return_msg("error abcdefghijklmnopqrstuvwxyz123456") == "error [redacted]"
+
+
+def test_regular_account_tr_keeps_api_id_and_bearer_token(monkeypatch):
+    monkeypatch.setenv("KIWOOM_MODE", "live")
+    monkeypatch.setenv("KIWOOM_APP_KEY", "configured-app-key")
+    monkeypatch.setenv("KIWOOM_SECRET_KEY", "configured-secret")
+    monkeypatch.setenv("KIWOOM_ACCOUNT_NO", "configured-account")
+    get_settings.cache_clear()
+    capture = {}
+
+    async def fake_token():
+        return "live-token-value"
+
+    monkeypatch.setattr(kiwoom_module.token_manager, "get_access_token", fake_token)
+    monkeypatch.setattr(
+        "app.services.kiwoom_client.httpx.AsyncClient",
+        lambda timeout=10: CapturingTrClient(FakeTrResponse({"acctNo": "MOCK", "return_code": 0}), capture),
+    )
+    client = kiwoom_module.KiwoomClient()
+
+    response = asyncio.run(client.request_tr("ka00001"))
+
+    assert response.api_id == "ka00001"
+    headers = capture["kwargs"]["headers"]
+    assert headers["api-id"] == "ka00001"
+    assert headers["Authorization"] == "Bearer live-token-value"
+    assert headers["cont-yn"] == "N"
+    assert headers["next-key"] == ""
 
 
 def test_au10001_token_field_is_accepted(monkeypatch):
