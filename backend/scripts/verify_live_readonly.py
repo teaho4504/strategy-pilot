@@ -85,6 +85,24 @@ def print_safe_failure(api_id: str, exc: Exception) -> None:
         print(f"return_code={return_code}")
 
 
+def print_token_request_diagnostics() -> None:
+    from app.services.token_manager import token_manager
+
+    diagnostics = token_manager.token_request_diagnostics()
+    print("token_request:")
+    for key in (
+        "method",
+        "base_url_present",
+        "path",
+        "api_id_present",
+        "api_id_expected_match",
+        "appkey_present",
+        "secretkey_present",
+        "authorization_header_present",
+    ):
+        print(f"- {key}={diagnostics[key]}")
+
+
 async def request_token_only() -> object:
     from app.services.kiwoom_client import KiwoomResponse
     from app.services.token_manager import token_manager
@@ -181,6 +199,8 @@ async def run_live_readonly_verification() -> int:
 
     for step in build_steps():
         print(f"{step.api_id}: start {step.description}")
+        if step.api_id == "au10001":
+            print_token_request_diagnostics()
         try:
             response = await step.call()
             step.validate(response)

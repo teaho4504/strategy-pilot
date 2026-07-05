@@ -151,3 +151,22 @@ The documentation baseline prepared the next implementation step.
 
 - No actual Kiwoom API call was made for this fix.
 - No order, WebSocket, Worker, AWS, Vercel, or frontend code was added.
+
+## 2026-07-05: au10001 Request Contract Diagnostics Prepared
+
+### Reason
+
+- Live read-only verification received a Kiwoom `return_code=3` for `au10001`, which indicates an API ID contract problem.
+- The local environment and guard checks were already passing, so the next fix focused on request construction and safe diagnostics rather than credentials or live retries.
+
+### Changes
+
+- Centralized the token API ID as `au10001` and the token path as `/oauth2/token`.
+- Validate token request path and `api-id` header before issuing the token HTTP request.
+- Treat blank `KIWOOM_TOKEN_URL` as unset and fall back to `KIWOOM_BASE_URL + /oauth2/token`.
+- Add safe token request diagnostics that show only method, path, boolean configuration presence, and API ID match state.
+
+### Boundaries
+
+- No actual Kiwoom API call was made for this diagnostic fix.
+- No raw request body, raw response body, app key, secret key, token, or account number is logged.

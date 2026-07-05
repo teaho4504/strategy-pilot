@@ -17,11 +17,12 @@ from app.services.account_service import (
     map_portfolio_response,
 )
 from app.services.kiwoom_client import KiwoomConfigurationError, KiwoomResponse, TR_SPECS
-from app.services.token_manager import TokenManager, TokenManagerError, token_manager
+from app.services.token_manager import TOKEN_API_ID, TOKEN_PATH, TokenManager, TokenManagerError, token_manager
 from scripts.verify_live_readonly import (
     CONFIRM_VALUE,
     LiveVerifyBlocked,
     load_backend_env_file,
+    print_token_request_diagnostics,
     print_safe_failure,
     print_safe_step_result,
     validate_live_verify_environment,
@@ -36,6 +37,8 @@ def reset_settings_and_token(monkeypatch):
         "KIWOOM_SECRET_KEY",
         "KIWOOM_APP_SECRET",
         "KIWOOM_ACCOUNT_NO",
+        "KIWOOM_BASE_URL",
+        "KIWOOM_TOKEN_URL",
         "KIWOOM_READ_ONLY",
         "KIWOOM_ENABLE_ORDER",
     ):
@@ -162,6 +165,63 @@ def install_fake_token_response(monkeypatch, body, status_code=200):
         "app.services.token_manager.httpx.AsyncClient",
         lambda timeout=10: FakeTokenClient(FakeTokenResponse(body, status_code=status_code)),
     )
+
+
+def test_token_url_default_uses_official_path(monkeypatch):
+    monkeypatch.setenv("KIWOOM_BASE_URL", "https://api.kiwoom.com")
+    monkeypatch.delenv("KIWOOM_TOKEN_URL", raising=False)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.token_url == "https://api.kiwoom.com/oauth2/token"
+
+
+def test_blank_token_url_falls_back_to_default(monkeypatch):
+    monkeypatch.setenv("KIWOOM_BASE_URL", "https://api.kiwoom.com/")
+    monkeypatch.setenv("KIWOOM_TOKEN_URL", "   ")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+
+    assert settings.token_url == "https://api.kiwoom.com/oauth2/token"
+
+
+def test_token_request_header_uses_official_api_id():
+    assert TokenManager._token_request_headers() == {"api-id": TOKEN_API_ID}
+    assert TOKEN_API_ID == "au10001"
+
+
+def test_token_request_rejects_wrong_api_id():
+    with pytest.raises(TokenManagerError):
+        TokenManager._token_request_headers("api-id")
+
+
+def test_token_request_rejects_wrong_path():
+    with pytest.raises(TokenManagerError):
+        TokenManager._validate_token_request("https://api.kiwoom.com/api/dostk/acnt", {"api-id": TOKEN_API_ID})
+
+
+def test_token_request_diagnostics_are_safe(monkeypatch, capsys):
+    monkeypatch.setenv("KIWOOM_MODE", "live")
+    monkeypatch.setenv("KIWOOM_BASE_URL", "https://api.kiwoom.com")
+    monkeypatch.setenv("KIWOOM_APP_KEY", "visible-app-key")
+    monkeypatch.setenv("KIWOOM_SECRET_KEY", "visible-secret-key")
+    monkeypatch.setenv("KIWOOM_ACCOUNT_NO", "1234567890")
+    get_settings.cache_clear()
+
+    diagnostics = token_manager.token_request_diagnostics()
+    print_token_request_diagnostics()
+
+    output = capsys.readouterr().out
+    assert diagnostics["path"] == TOKEN_PATH
+    assert diagnostics["api_id_expected_match"] is True
+    assert "visible-app-key" not in output
+    assert "visible-secret-key" not in output
+    assert "1234567890" not in output
+    assert "appkey_present=True" in output
+    assert "secretkey_present=True" in output
+    assert "api_id_expected_match=True" in output
 
 
 def test_au10001_token_field_is_accepted(monkeypatch):
