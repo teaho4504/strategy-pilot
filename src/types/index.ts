@@ -1,5 +1,5 @@
-// Domain types for AutoTrader KR demo dashboard.
-// NOTE: All values powered by mock adapters. No real brokerage integration.
+// Domain types for AutoTrader KR dashboard.
+// Broker secrets stay server-side; the frontend calls only project-owned APIs.
 
 export type AutomationState = "idle" | "running" | "paused" | "error";
 
@@ -7,8 +7,10 @@ export interface Account {
   id: string;
   broker: string;        // e.g. "키움증권"
   label: string;         // e.g. "데모계좌"
-  isDemo: true;          // demo-only in this prototype
+  isDemo: boolean;
   maskedNumber: string;  // e.g. "****-**-1234"
+  mode?: string;
+  updatedAt?: string;
 }
 
 export interface Portfolio {
@@ -19,6 +21,76 @@ export interface Portfolio {
   cumulativePnl: number;     // 누적 손익
   cashRatio: number;         // 현금 비중(0-1)
   intradayCurve: { t: string; v: number }[]; // 시간별 평가곡선
+  source?: string;
+  updatedAt?: string;
+}
+
+export interface CashBalance {
+  cash: number;
+  withdrawableAmount: number;
+  orderableAmount: number;
+  source: string;
+  updatedAt: string;
+}
+
+export interface Holding {
+  code: string;
+  name: string;
+  quantity: number;
+  averagePrice: number;
+  currentPrice: number;
+  valuationAmount: number;
+  profitLoss: number;
+  returnRate: number;
+  weight: number;
+  updatedAt: string;
+}
+
+export interface PerformanceItem {
+  code: string;
+  name: string;
+  quantity: number;
+  purchaseAmount: number;
+  currentPrice: number;
+  averagePrice: number;
+  valuationAmount: number;
+  profitLoss: number;
+  returnRate: number;
+}
+
+export interface PerformanceSummary {
+  accountId: string;
+  totalPurchaseAmount: number;
+  totalValuationAmount: number;
+  totalProfitLoss: number;
+  totalReturnRate: number;
+  items: PerformanceItem[];
+  source: string;
+  updatedAt: string;
+}
+
+export interface BackendHealth {
+  status: string;
+  mode: "mock" | "live" | string;
+  kiwoom: {
+    readOnly: boolean;
+    orderEnabled: boolean;
+    configured?: boolean;
+    tokenCached?: boolean;
+    missing?: string[];
+  };
+  lastSuccessAt?: string | null;
+  lastError?: string | null;
+}
+
+export interface KiwoomStatus {
+  mode: "mock" | "live" | string;
+  readOnly: boolean;
+  orderEnabled: boolean;
+  configured: boolean;
+  tokenCached: boolean;
+  tokenExpiresAt: string | null;
+  missing: string[];
 }
 
 export interface MarketIndex {

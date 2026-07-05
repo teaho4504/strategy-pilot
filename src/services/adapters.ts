@@ -18,15 +18,24 @@ import {
   accounts, portfolio, marketIndices, watchlist, strategies,
   orders, timeline, analytics, riskSettings,
 } from "./mock/data";
+import { readonlyApiClient } from "./apiClient";
 import type { Strategy, Order } from "@/types";
 
 const wait = <T,>(v: T, ms = 120) => new Promise<T>((r) => setTimeout(() => r(v), ms));
 
 export const portfolioAdapter = {
-  getAccounts: () => wait(accounts),
-  getPortfolio: (_accountId: string) => wait(portfolio),
+  getHealth: readonlyApiClient.health,
+  getKiwoomStatus: readonlyApiClient.kiwoomStatus,
+  getAccounts: readonlyApiClient.accounts,
+  getCash: readonlyApiClient.cash,
+  getPortfolio: (_accountId?: string) => readonlyApiClient.portfolio(),
+  getHoldings: readonlyApiClient.holdings,
+  getPerformance: readonlyApiClient.performance,
   getMarketIndices: () => wait(marketIndices),
-  getWatchlist: () => wait(watchlist),
+  getWatchlist: readonlyApiClient.watchlist,
+  getMockAccounts: () => wait(accounts),
+  getMockPortfolio: () => wait(portfolio),
+  getMockWatchlist: () => wait(watchlist),
 };
 
 export const strategyAdapter = {

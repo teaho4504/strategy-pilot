@@ -234,3 +234,24 @@ The documentation baseline prepared the next implementation step.
 - No actual Kiwoom API call was made during mapper refinement.
 - No API response contract breaking change was introduced.
 - No frontend, AWS, Vercel, Docker, order, WebSocket, or Worker code was changed.
+
+## 2026-07-05: Phase 2A Frontend Read-only API Integration Started
+
+### Facts
+
+- Work moved to `feature/frontend-readonly-api-integration` from the completed Phase 1 backend branch.
+- The Vite dashboard now uses a frontend API client for project-owned FastAPI `/api/*` endpoints.
+- Broker credentials remain backend-only and are not exposed through `VITE_*` variables.
+
+### Frontend Scope
+
+- Added a read-only API client with `VITE_API_BASE_URL` defaulting to `http://127.0.0.1:8000`.
+- Connected home dashboard account, portfolio, cash, holdings, performance, backend health, Kiwoom status, and watchlist reads.
+- Kept strategy, timeline, order, analytics, and risk mock behavior outside the Phase 2A backend read scope.
+- API failure displays safe endpoint/status/error-type guidance and does not silently fall back to mock account data.
+
+### Boundaries
+
+- No backend mapper changes were made.
+- No actual Kiwoom API call was made by this work.
+- No order, amend, cancel, WebSocket, Worker, AWS, Vercel, Docker, or package changes were made.
