@@ -6,6 +6,8 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import auth as auth_module
+from app.core.auth import AuthenticatedUser, SupabaseAuthError, _email_from_claims, _get_jwk_client
 from app.core.config import get_settings
 from app.main import app
 from app.services import kiwoom_client as kiwoom_module
@@ -44,6 +46,10 @@ def reset_settings_and_token(monkeypatch):
         "KIWOOM_TOKEN_URL",
         "KIWOOM_READ_ONLY",
         "KIWOOM_ENABLE_ORDER",
+        "SUPABASE_URL",
+        "SUPABASE_JWT_ISSUER",
+        "SUPABASE_JWT_AUDIENCE",
+        "ALLOWED_USER_EMAILS",
     ):
         monkeypatch.delenv(key, raising=False)
     get_settings.cache_clear()
@@ -63,8 +69,113 @@ def test_mock_mode_is_default_and_health_loads():
     assert body["mode"] == "mock"
     assert body["kiwoom"]["readOnly"] is True
     assert body["kiwoom"]["orderEnabled"] is False
+    for path in ("/api/kiwoom/status", "/"):
+        assert client.get(path).status_code == 200
+
+
+def test_protected_account_api_requires_authentication():
+    response = TestClient(app).get("/api/accounts")
+
+    assert response.status_code == 401
+
+
+def test_basic_authorization_header_returns_401():
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Basic abc"})
+
+    assert response.status_code == 401
+
+
+def test_empty_bearer_authorization_header_returns_401():
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Bearer"})
+
+    assert response.status_code == 401
+
+
+def test_protected_watchlist_requires_authentication():
+    response = TestClient(app).get("/api/market/watchlist")
+
+    assert response.status_code == 401
+
+
+
+def test_invalid_jwt_returns_401(monkeypatch):
+    monkeypatch.setenv("ALLOWED_USER_EMAILS", "allowed@example.com")
+    get_settings.cache_clear()
+
+    def fail_verify(token: str):
+        raise SupabaseAuthError("invalid token")
+
+    monkeypatch.setattr(auth_module, "verify_supabase_jwt", fail_verify)
+
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Bearer invalid-token"})
+
+    assert response.status_code == 401
+
+
+def test_jwk_client_uses_timeout():
+    auth_module._jwk_clients.clear()
+
+    client = _get_jwk_client("https://example.supabase.co/auth/v1/.well-known/jwks.json")
+
+    assert client.timeout == 5
+
+
+def test_email_claim_must_be_string():
+    with pytest.raises(SupabaseAuthError):
+        _email_from_claims({"email": ["allowed@example.com"]})
+
+    with pytest.raises(SupabaseAuthError):
+        _email_from_claims({"user_metadata": {"email": 123}})
+
+    with pytest.raises(SupabaseAuthError):
+        _email_from_claims({"email": "   "})
+
+
+def test_email_claim_is_normalized_from_primary_or_metadata():
+    assert _email_from_claims({"email": " Allowed@Example.COM "}) == "allowed@example.com"
+    assert _email_from_claims({"user_metadata": {"email": " Meta@Example.COM "}}) == "meta@example.com"
+
+
+def test_authenticated_email_not_in_allowlist_returns_403(monkeypatch):
+    monkeypatch.setenv("ALLOWED_USER_EMAILS", "allowed@example.com")
+    get_settings.cache_clear()
+
+    def verify(token: str):
+        return AuthenticatedUser(email="other@example.com", subject="user-id")
+
+    monkeypatch.setattr(auth_module, "verify_supabase_jwt", verify)
+
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Bearer valid-token"})
+
+    assert response.status_code == 403
+
+
+def test_empty_allowlist_blocks_authenticated_user(monkeypatch):
+    get_settings.cache_clear()
+
+    def verify(token: str):
+        return AuthenticatedUser(email="allowed@example.com", subject="user-id")
+
+    monkeypatch.setattr(auth_module, "verify_supabase_jwt", verify)
+
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Bearer valid-token"})
+
+    assert response.status_code == 403
+
+
+
+def test_allowed_authenticated_user_can_access_mock_account_api(monkeypatch):
+    monkeypatch.setenv("ALLOWED_USER_EMAILS", "allowed@example.com")
+    get_settings.cache_clear()
+
+    def verify(token: str):
+        return AuthenticatedUser(email="allowed@example.com", subject="user-id")
+
+    monkeypatch.setattr(auth_module, "verify_supabase_jwt", verify)
+
+    client = TestClient(app)
+
     for path in (
-        "/api/kiwoom/status",
         "/api/accounts",
         "/api/account/cash",
         "/api/account/portfolio",
@@ -72,7 +183,7 @@ def test_mock_mode_is_default_and_health_loads():
         "/api/account/holdings",
         "/api/market/watchlist",
     ):
-        assert client.get(path).status_code == 200
+        assert client.get(path, headers={"Authorization": "Bearer valid-token"}).status_code == 200
 
 
 def test_status_does_not_expose_secret_values(monkeypatch):
@@ -99,9 +210,15 @@ def test_status_does_not_expose_secret_values(monkeypatch):
 
 def test_live_mode_missing_credentials_returns_400(monkeypatch):
     monkeypatch.setenv("KIWOOM_MODE", "live")
+    monkeypatch.setenv("ALLOWED_USER_EMAILS", "allowed@example.com")
     get_settings.cache_clear()
 
-    response = TestClient(app).get("/api/accounts")
+    def verify(token: str):
+        return AuthenticatedUser(email="allowed@example.com", subject="user-id")
+
+    monkeypatch.setattr(auth_module, "verify_supabase_jwt", verify)
+
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Bearer valid-token"})
 
     assert response.status_code == 400
     assert "KIWOOM_APP_KEY" in response.text
@@ -114,14 +231,20 @@ def test_token_failure_returns_backend_error(monkeypatch):
     monkeypatch.setenv("KIWOOM_APP_KEY", "configured-app-key")
     monkeypatch.setenv("KIWOOM_SECRET_KEY", "configured-secret")
     monkeypatch.setenv("KIWOOM_ACCOUNT_NO", "configured-account")
+    monkeypatch.setenv("ALLOWED_USER_EMAILS", "allowed@example.com")
     get_settings.cache_clear()
+
+    def verify(token: str):
+        return AuthenticatedUser(email="allowed@example.com", subject="user-id")
+
+    monkeypatch.setattr(auth_module, "verify_supabase_jwt", verify)
 
     async def fail_token():
         raise TokenManagerError("Kiwoom token HTTP error: 401")
 
     monkeypatch.setattr(kiwoom_module.token_manager, "get_access_token", fail_token)
 
-    response = TestClient(app).get("/api/accounts")
+    response = TestClient(app).get("/api/accounts", headers={"Authorization": "Bearer valid-token"})
 
     assert response.status_code == 502
     assert "configured-app-key" not in response.text

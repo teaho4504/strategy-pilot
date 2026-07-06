@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.auth import require_authenticated_user
 from app.schemas.account import Account, CashBalance, PerformanceSummary
 from app.schemas.portfolio import Holding, Portfolio
 from app.services.account_service import MapperValidationError
@@ -8,7 +9,7 @@ from app.services.kiwoom_client import KiwoomClientError
 from app.services.runtime_state import mark_error
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_authenticated_user)])
 
 
 def raise_backend_error(exc: Exception) -> None:

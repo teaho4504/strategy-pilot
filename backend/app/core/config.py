@@ -44,6 +44,14 @@ class Settings:
             ).split(",")
             if origin.strip()
         ]
+        self.supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+        self.supabase_jwt_issuer = os.getenv("SUPABASE_JWT_ISSUER", "").strip()
+        self.supabase_jwt_audience = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated").strip() or "authenticated"
+        self.allowed_user_emails = {
+            email.strip().lower()
+            for email in os.getenv("ALLOWED_USER_EMAILS", "").split(",")
+            if email.strip()
+        }
 
     @staticmethod
     def _mode(value: str) -> KiwoomMode:
@@ -89,6 +97,12 @@ class Settings:
             "orderEnabled": self.order_enabled,
             "missing": self.missing_kiwoom_env if self.kiwoom_mode == "live" else [],
         }
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        if not self.supabase_url:
+            return ""
+        return f"{self.supabase_url}/auth/v1/.well-known/jwks.json"
 
 
 @lru_cache(maxsize=1)
