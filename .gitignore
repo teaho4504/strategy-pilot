@@ -11,6 +11,15 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+
+# Python / FastAPI backend
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+backend/.env
+deploy/backend/.env
 
 # Editor directories and files
 .vscode/*
