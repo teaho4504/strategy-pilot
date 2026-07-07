@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import { setAccessTokenProvider, setUnauthorizedHandler } from "@/services/apiClient";
 
-type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "recovery";
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -12,25 +12,40 @@ interface AuthContextValue {
   email: string | null;
   configured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  updateRecoveryPassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isRecoveryRedirectUrl() {
+  if (typeof window === "undefined") return false;
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const queryParams = new URLSearchParams(window.location.search);
+  return hashParams.get("type") === "recovery" || queryParams.get("type") === "recovery";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(isSupabaseConfigured ? "loading" : "unauthenticated");
+  const [status, setStatus] = useState<AuthStatus>(isSupabaseConfigured ? (isRecoveryRedirectUrl() ? "recovery" : "loading") : "unauthenticated");
+
+  const clearRecoveryUrl = useCallback(() => {
+    if (typeof window !== "undefined" && (window.location.hash || window.location.search)) {
+      window.history.replaceState(null, document.title, window.location.pathname);
+    }
+  }, []);
 
   const clearSession = useCallback(() => {
     setSession(null);
     setStatus("unauthenticated");
     queryClient.clear();
-  }, [queryClient]);
+    clearRecoveryUrl();
+  }, [clearRecoveryUrl, queryClient]);
 
   useEffect(() => {
-    setAccessTokenProvider(() => session?.access_token ?? null);
-  }, [session]);
+    setAccessTokenProvider(() => (status === "authenticated" ? session?.access_token ?? null : null));
+  }, [session, status]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -53,12 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session ?? null);
+      if (isRecoveryRedirectUrl()) {
+        setStatus("recovery");
+        return;
+      }
       setStatus(data.session ? "authenticated" : "unauthenticated");
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
-      setStatus(nextSession ? "authenticated" : "unauthenticated");
+      setStatus(event === "PASSWORD_RECOVERY" ? "recovery" : nextSession ? "authenticated" : "unauthenticated");
       if (!nextSession) queryClient.clear();
     });
 
@@ -76,6 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus(data.session ? "authenticated" : "unauthenticated");
   }, []);
 
+  const updateRecoveryPassword = useCallback(async (password: string) => {
+    if (!supabase) throw new Error("Supabase is not configured");
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    await supabase.auth.signOut();
+    clearSession();
+  }, [clearSession]);
+
   const signOut = useCallback(async () => {
     if (supabase) await supabase.auth.signOut();
     clearSession();
@@ -87,8 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: session?.user.email ?? null,
     configured: isSupabaseConfigured,
     signIn,
+    updateRecoveryPassword,
     signOut,
-  }), [session, signIn, signOut, status]);
+  }), [session, signIn, signOut, status, updateRecoveryPassword]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

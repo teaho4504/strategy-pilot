@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LoginScreen } from "@/auth/LoginScreen";
+import { PasswordRecoveryScreen } from "@/auth/PasswordRecoveryScreen";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,6 +34,9 @@ function AuthenticatedApp() {
   }
 
   if (status !== "authenticated") {
+    if (status === "recovery") {
+      return <PasswordRecoveryScreen />;
+    }
     return <LoginScreen />;
   }
 
