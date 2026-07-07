@@ -15,18 +15,22 @@
  */
 
 import {
-  accounts, portfolio, marketIndices, watchlist, strategies,
+  marketIndices, strategies,
   orders, timeline, analytics, riskSettings,
 } from "./mock/data";
+import { readonlyApiClient } from "./apiClient";
 import type { Strategy, Order } from "@/types";
 
 const wait = <T,>(v: T, ms = 120) => new Promise<T>((r) => setTimeout(() => r(v), ms));
 
 export const portfolioAdapter = {
-  getAccounts: () => wait(accounts),
-  getPortfolio: (_accountId: string) => wait(portfolio),
+  getAccounts: () => readonlyApiClient.accounts(),
+  getPortfolio: (_accountId: string) => readonlyApiClient.portfolio(),
+  getCash: () => readonlyApiClient.cash(),
+  getHoldings: () => readonlyApiClient.holdings(),
+  getPerformance: () => readonlyApiClient.performance(),
   getMarketIndices: () => wait(marketIndices),
-  getWatchlist: () => wait(watchlist),
+  getWatchlist: () => readonlyApiClient.watchlist(),
 };
 
 export const strategyAdapter = {

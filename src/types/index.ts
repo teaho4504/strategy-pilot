@@ -7,8 +7,10 @@ export interface Account {
   id: string;
   broker: string;        // e.g. "키움증권"
   label: string;         // e.g. "데모계좌"
-  isDemo: true;          // demo-only in this prototype
+  isDemo: boolean;
   maskedNumber: string;  // e.g. "****-**-1234"
+  mode?: string;
+  updatedAt?: string;
 }
 
 export interface Portfolio {
@@ -19,6 +21,8 @@ export interface Portfolio {
   cumulativePnl: number;     // 누적 손익
   cashRatio: number;         // 현금 비중(0-1)
   intradayCurve: { t: string; v: number }[]; // 시간별 평가곡선
+  source?: string;
+  updatedAt?: string;
 }
 
 export interface MarketIndex {

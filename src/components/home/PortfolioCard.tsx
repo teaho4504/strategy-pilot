@@ -1,11 +1,34 @@
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/common/Card";
 import { DeltaPct } from "@/components/common/DeltaPct";
 import { won, wonCompact } from "@/lib/format";
-import { portfolio } from "@/services/mock/data";
+import { portfolioAdapter } from "@/services/adapters";
+import { safeApiError } from "@/services/apiClient";
 
 export function PortfolioCard() {
-  const p = portfolio;
+  const portfolioQuery = useQuery({ queryKey: ["portfolio"], queryFn: () => portfolioAdapter.getPortfolio("default") });
+  const cashQuery = useQuery({ queryKey: ["cash"], queryFn: portfolioAdapter.getCash });
+  const holdingsQuery = useQuery({ queryKey: ["holdings"], queryFn: portfolioAdapter.getHoldings });
+  const performanceQuery = useQuery({ queryKey: ["performance"], queryFn: portfolioAdapter.getPerformance });
+  const p = portfolioQuery.data;
+
+  if (portfolioQuery.isLoading) {
+    return <Card><div className="py-8 text-center text-sm text-muted-foreground">backend 계좌 데이터를 불러오는 중</div></Card>;
+  }
+
+  if (!p || portfolioQuery.isError) {
+    const safe = safeApiError(portfolioQuery.error);
+    return (
+      <Card>
+        <div className="text-sm font-semibold text-danger">KIWOOM CONNECTION ERROR</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          endpoint={safe?.endpoint ?? "/api/account/portfolio"} {safe?.status ? `http=${safe.status}` : safe?.type}
+        </div>
+      </Card>
+    );
+  }
+
   const up = p.dayPnl >= 0;
   return (
     <Card className="overflow-hidden p-0">
@@ -26,8 +49,12 @@ export function PortfolioCard() {
 
         <div className="grid grid-cols-3 divide-x divide-border rounded-xl border border-border bg-surface-3/40">
           <Stat label="누적 손익" value={won(p.cumulativePnl, { sign: true })} tone={p.cumulativePnl >= 0 ? "up" : "down"} />
-          <Stat label="현금" value={wonCompact(p.cash)} />
+          <Stat label="현금" value={wonCompact(cashQuery.data?.cash ?? p.cash)} />
           <Stat label="현금 비중" value={`${Math.round(p.cashRatio * 100)}%`} />
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+          <div>보유종목 {holdingsQuery.data?.length ?? "-"}개</div>
+          <div className="text-right">수익률 {performanceQuery.data ? `${performanceQuery.data.totalReturnRate.toFixed(2)}%` : "-"}</div>
         </div>
       </div>
 
