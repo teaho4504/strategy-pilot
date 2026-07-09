@@ -234,3 +234,30 @@ The documentation baseline prepared the next implementation step.
 - No actual Kiwoom API call was made during mapper refinement.
 - No API response contract breaking change was introduced.
 - No frontend, AWS, Vercel, Docker, order, WebSocket, or Worker code was changed.
+
+## 2026-07-09: Kiwoom REST Provider Skeleton Started
+
+### Reference
+
+- Official reference repository: `Kiwoom-Securities/Kiwoom-REST-API`.
+- The repository was used only to understand structure and protocol boundaries:
+  CLI/keyring-first credentials, regular TR headers, separated OAuth handling,
+  WebSocket LOGIN and REG/REMOVE packet shape, and the existence of order
+  examples that must not be executed.
+- No official repository code was copied into this project.
+
+### Added
+
+- `backend/trading_engine/providers/kiwoom_rest/` skeleton package.
+- Read-only REST client skeleton with live provider disabled by default.
+- WebSocket skeleton with connect blocked by default.
+- Payload adapter functions for quote, order book, and condition payloads.
+- Safety helpers for order blocking and secret redaction.
+
+### Boundaries
+
+- No actual HTTP or WebSocket call is made.
+- No Kiwoom key, token, account number, or `.env` value is added.
+- No order endpoint or executable order method is added.
+- Official order samples remain excluded until a separate live-order safety
+  architecture is approved.
