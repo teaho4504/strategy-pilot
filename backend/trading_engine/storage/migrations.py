@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS paper_fills (
   reason TEXT NOT NULL,
   strategy_name TEXT NOT NULL,
   condition_name TEXT NOT NULL,
-  filled_at TEXT NOT NULL
+  filled_at TEXT NOT NULL,
+  filled_at_kst TEXT NOT NULL,
+  us_market_date TEXT NOT NULL,
+  us_session TEXT NOT NULL
 );
 """

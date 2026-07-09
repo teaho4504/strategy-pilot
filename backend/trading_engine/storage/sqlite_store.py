@@ -5,6 +5,7 @@ import sqlite3
 
 from trading_engine.domain.events import ConditionEvent, MarketDataEvent
 from trading_engine.domain.models import DailyJournal, PaperFill, StrategySignal
+from trading_engine.services.market_time import market_time_context
 from trading_engine.storage.migrations import SCHEMA
 
 
@@ -15,10 +16,20 @@ class SQLiteStore:
         self.connection = sqlite3.connect(self.db_path)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(SCHEMA)
+        self._ensure_compatible_schema()
         self.connection.commit()
 
     def close(self) -> None:
         self.connection.close()
+
+    def _ensure_compatible_schema(self) -> None:
+        columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(paper_fills)").fetchall()}
+        if "filled_at_kst" not in columns:
+            self.connection.execute("ALTER TABLE paper_fills ADD COLUMN filled_at_kst TEXT NOT NULL DEFAULT ''")
+        if "us_market_date" not in columns:
+            self.connection.execute("ALTER TABLE paper_fills ADD COLUMN us_market_date TEXT NOT NULL DEFAULT ''")
+        if "us_session" not in columns:
+            self.connection.execute("ALTER TABLE paper_fills ADD COLUMN us_session TEXT NOT NULL DEFAULT 'closed'")
 
     def record_condition_event(self, event: ConditionEvent) -> None:
         self.connection.execute(
@@ -55,10 +66,15 @@ class SQLiteStore:
         self.connection.commit()
 
     def record_fill(self, fill: PaperFill) -> None:
+        time_context = market_time_context(fill.filled_at)
         self.connection.execute(
             """
-            INSERT INTO paper_fills(symbol, symbol_name, side, quantity, price, fee, slippage, realized_pnl, reason, strategy_name, condition_name, filled_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO paper_fills(
+              symbol, symbol_name, side, quantity, price, fee, slippage,
+              realized_pnl, reason, strategy_name, condition_name, filled_at,
+              filled_at_kst, us_market_date, us_session
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 fill.symbol,
@@ -73,6 +89,9 @@ class SQLiteStore:
                 fill.strategy_name,
                 fill.condition_name,
                 fill.filled_at.isoformat(),
+                time_context.kst.isoformat(),
+                time_context.us_market_date,
+                time_context.us_session.value,
             ),
         )
         self.connection.commit()
@@ -82,7 +101,7 @@ class SQLiteStore:
         return int(row["c"])
 
     def daily_journal(self, trade_date: str) -> DailyJournal:
-        fills = self.connection.execute("SELECT * FROM paper_fills WHERE substr(filled_at, 1, 10) = ?", (trade_date,)).fetchall()
+        fills = self.connection.execute("SELECT * FROM paper_fills WHERE us_market_date = ?", (trade_date,)).fetchall()
         risk_blocks = self.connection.execute("SELECT COUNT(*) AS c FROM risk_blocks WHERE substr(created_at, 1, 10) = ?", (trade_date,)).fetchone()
         entries = [row for row in fills if row["side"] == "buy"]
         exits = [row for row in fills if row["side"] == "sell"]

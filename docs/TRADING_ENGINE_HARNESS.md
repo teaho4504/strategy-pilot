@@ -57,6 +57,27 @@ The provider skeleton is designed to fail closed:
 - Order TR constants are documented but not connected to a client path.
 - Secret-like fields are sanitized before diagnostic output.
 
+## Safety Phase: DB, Time, And Risk Guardrails
+
+The safety phase added guardrails before any live realtime work:
+
+- SQLite runtime files are ignored via `*.sqlite3` and `backend/data/*.sqlite3`.
+- `TRADING_ENGINE_DB_PATH` is the supported override for local/test/production
+  paper DB location.
+- Paper fills now store KST display time, US market date, and US market session
+  classification fields.
+- Daily journal aggregation uses US market date so Korean local time does not
+  accidentally split US trading sessions.
+- Risk tests cover Kill Switch, daily loss, same-symbol cooldown, max open
+  positions, and per-symbol entry amount.
+
+Still future work:
+
+- US exchange holiday calendar.
+- Early-close calendar.
+- Persistent runtime config management.
+- Dashboard status API for engine risk state.
+
 ## Next Allowed Step
 
 The next safe integration step is still read-only:

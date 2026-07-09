@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from trading_engine.config import EngineSettings
+from trading_engine.config import EngineSettings, get_engine_settings
 from trading_engine.domain.enums import ConditionEventType, FillSide, SignalType, WatchStatus
 from trading_engine.domain.events import ConditionEvent, MarketDataEvent
+from trading_engine.domain.models import AccountState, StrategySignal
 from trading_engine.providers.mock_condition_provider import MockConditionProvider
 from trading_engine.services.condition_monitor import ConditionMonitor
 from trading_engine.services.journal_service import JournalService
+from trading_engine.services.market_time import UsMarketSession, market_time_context
 from trading_engine.services.market_cache import MarketCache
 from trading_engine.services.paper_broker import PaperBroker
 from trading_engine.services.risk_manager import RiskManager
@@ -178,12 +180,41 @@ def test_daily_journal_aggregates_paper_trades(store, entered_event, market_even
     store.record_fill(buy)
     store.record_fill(sell)
 
-    journal = JournalService(store).daily(buy.filled_at.date().isoformat())
+    journal = JournalService(store).daily(market_time_context(buy.filled_at).us_market_date)
 
     assert journal.entries == 1
     assert journal.exits == 1
     assert journal.total_pnl == sell.realized_pnl
     assert journal.strategy_breakdown[signal.strategy_name]["entries"] == 1
+
+
+def test_fill_records_kst_and_us_market_date(store, entered_event, market_event):
+    item = WatchlistManager().handle_condition_event(entered_event)
+    signal = SimpleConditionStrategy().evaluate(item, MarketCache().apply_event(market_event, item), PaperBroker().account_state())
+    fill = PaperBroker().paper_buy(item, signal, market_event.last_price, amount=500_000)
+
+    store.record_fill(fill)
+    row = store.connection.execute("SELECT filled_at_kst, us_market_date, us_session FROM paper_fills").fetchone()
+
+    assert row["filled_at_kst"]
+    assert row["us_market_date"] == market_time_context(fill.filled_at).us_market_date
+    assert row["us_session"] in {session.value for session in UsMarketSession}
+
+
+def test_trading_engine_db_path_env_uses_tmp_path(monkeypatch, tmp_path):
+    db_path = tmp_path / "custom-engine.sqlite3"
+
+    monkeypatch.setenv("TRADING_ENGINE_DB_PATH", str(db_path))
+
+    assert get_engine_settings().db_path == db_path
+
+
+def test_market_time_context_has_kst_and_us_market_date():
+    context = market_time_context(datetime(2026, 7, 10, 14, 0, tzinfo=timezone.utc))
+
+    assert context.kst.tzinfo is not None
+    assert context.us_market_date == "2026-07-10"
+    assert context.us_session == UsMarketSession.REGULAR
 
 
 def test_order_related_paths_are_disabled_by_configuration():
@@ -192,6 +223,47 @@ def test_order_related_paths_are_disabled_by_configuration():
     assert settings.mode == "paper"
     assert settings.order_enabled is False
     assert settings.live_provider_enabled is False
+
+
+def test_daily_max_loss_blocks_entry():
+    signal = StrategySignal(SignalType.PAPER_BUY_CANDIDATE, "005930", "test", "test")
+    risk = RiskManager(EngineSettings(daily_max_loss=100_000))
+
+    decision = risk.check_entry(signal, AccountState(daily_loss=100_000), entry_amount=50_000)
+
+    assert decision.allowed is False
+    assert "daily max loss" in decision.reason
+
+
+def test_reentry_cooldown_blocks_same_symbol():
+    signal = StrategySignal(SignalType.PAPER_BUY_CANDIDATE, "005930", "test", "test")
+    risk = RiskManager(EngineSettings(reentry_cooldown_seconds=300))
+    risk.last_entry_at["005930"] = datetime.now(timezone.utc) - timedelta(seconds=30)
+
+    decision = risk.check_entry(signal, AccountState(), entry_amount=50_000)
+
+    assert decision.allowed is False
+    assert "cooldown" in decision.reason
+
+
+def test_max_open_positions_blocks_entry():
+    signal = StrategySignal(SignalType.PAPER_BUY_CANDIDATE, "005930", "test", "test")
+    risk = RiskManager(EngineSettings(max_open_positions=1))
+
+    decision = risk.check_entry(signal, AccountState(open_positions=1), entry_amount=50_000)
+
+    assert decision.allowed is False
+    assert "max open positions" in decision.reason
+
+
+def test_per_symbol_max_entry_amount_blocks_entry():
+    signal = StrategySignal(SignalType.PAPER_BUY_CANDIDATE, "005930", "test", "test")
+    risk = RiskManager(EngineSettings(per_symbol_max_entry_amount=100_000))
+
+    decision = risk.check_entry(signal, AccountState(), entry_amount=100_001)
+
+    assert decision.allowed is False
+    assert "per-symbol" in decision.reason
 
 
 def test_no_order_endpoint_or_kiwoom_order_api_is_imported():

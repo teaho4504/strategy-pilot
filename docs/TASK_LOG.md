@@ -261,3 +261,25 @@ The documentation baseline prepared the next implementation step.
 - No order endpoint or executable order method is added.
 - Official order samples remain excluded until a separate live-order safety
   architecture is approved.
+
+## 2026-07-10: Trading Engine Safety Phase
+
+### Added
+
+- Ignore rules for local SQLite runtime artifacts.
+- `TRADING_ENGINE_DB_PATH` verification for configurable paper DB location.
+- KST display time and US market date/session fields for paper fill journals.
+- US market session helper skeleton: premarket, regular, afterhours, closed.
+- Risk Manager regression tests for:
+  - Kill Switch block.
+  - Daily max loss block.
+  - Same-symbol cooldown block.
+  - Max open positions block.
+  - Per-symbol entry amount block.
+
+### Boundaries
+
+- No live Kiwoom REST call was made.
+- No live WebSocket connection was opened.
+- No order endpoint or order execution path was added.
+- `backend/data/*.sqlite3` and `pnpm-lock.yaml` remain excluded from this work.
