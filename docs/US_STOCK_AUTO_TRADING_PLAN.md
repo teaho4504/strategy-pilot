@@ -30,6 +30,36 @@ For now, only the structural lesson is used:
 6. Review risk limits, market hours, FX handling, and tax/reporting needs.
 7. Consider live order design only after separate safety approval.
 
+## Current TR Implementation Skeleton
+
+The project now has a local Python skeleton for US stock TR classification and
+request construction under `backend/trading_engine/providers/kiwoom_us/`.
+
+Implemented as non-network builders:
+
+- `ust21110`, `ust21120`, `ust21150`, `ust21510`, `ust21630`, `ust21650`
+- `usa20280`, `usa20281`, `usa20290`, `usa20291`
+- `FE`, `FT`
+
+Blocked as order-related:
+
+- `ust20000`, `ust20001`, `ust20002`, `ust20003`
+- `F4`
+
+The builders do not use credentials, do not open sockets, and do not call
+Kiwoom. They only normalize the TR inventory and fixture-test request shapes.
+
+## Read-only Client Skeleton
+
+The next local skeleton layer adds:
+
+- `KiwoomUsRestClientSkeleton` for request shape construction only.
+- Response mappers for condition search, account balance, and PnL fixtures.
+- Safety helpers that separate read-only TRs from blocked order TRs.
+
+This is still not a live provider. The client has no HTTP transport and
+`liveProvider=false` blocks execution before any external call could occur.
+
 ## Explicitly Blocked
 
 - Browser-direct Kiwoom API calls.

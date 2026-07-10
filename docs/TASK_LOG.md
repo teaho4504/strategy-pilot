@@ -283,3 +283,52 @@ The documentation baseline prepared the next implementation step.
 - No live WebSocket connection was opened.
 - No order endpoint or order execution path was added.
 - `backend/data/*.sqlite3` and `pnpm-lock.yaml` remain excluded from this work.
+
+## 2026-07-10: US Stock TR Skeleton From Sheet And PDF
+
+### Sources
+
+- Google Sheet `kiwoom_auto_trading_roadmap`, tab `05_API_TR관리`.
+- Local Kiwoom REST API PDF.
+
+### Added
+
+- US stock TR inventory under `backend/trading_engine/providers/kiwoom_us/`.
+- Read-only request builders for account/PnL TRs.
+- WebSocket request builders for condition search and realtime quote/order book
+  registration packets.
+- Fixture adapters for US quote and condition payloads.
+- Tests ensuring order TRs remain blocked and no network call is made.
+
+### Boundaries
+
+- No live Kiwoom API call was made.
+- No app key, secret, token, account number, or `.env` value was added.
+- US order TRs are inventoried but remain blocked.
+- No order endpoint was added.
+
+## 2026-07-10: US Stock Read-only Client Skeleton
+
+### Added
+
+- `KiwoomUsRestClientSkeleton` for US read-only TR request shape creation.
+- `UsReadOnlyTrRequest`, `UsReadOnlyTrResponse`, `UsAccountBalance`,
+  `UsProfitLoss`, and condition-search result models.
+- Fixture response mappers with `UsMappingError` on missing required fields.
+- Safety helpers for read-only allowlist, blocked order TRs, and realtime
+  channel checks.
+- Tests covering:
+  - Read-only TR allowlist.
+  - Blocked order TRs and blocked `F4`.
+  - `FE` and `FT` realtime channel allowance.
+  - `liveProvider=false` execution block.
+  - Absence of `httpx`, `requests`, and `websockets` imports in the skeleton.
+  - Fixture response mapping and safe validation errors.
+
+### Boundaries
+
+- No live Kiwoom REST call was made.
+- No live WebSocket connection was opened.
+- No transport layer was added.
+- No app key, secret, token, account number, or `.env` value was added.
+- US order TRs remain blocked by `UsOrderBlockedError`.
