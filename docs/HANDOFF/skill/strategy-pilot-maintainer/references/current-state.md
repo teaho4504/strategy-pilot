@@ -7,11 +7,12 @@ Verified on 2026-09-05 KST from the portable Windows workspace:
 - The workspace has no Git metadata; use the verified transfer archive as the source overlay and restore Git history separately.
 - The saved kiwoomcli real profile creates a backend-only read-only session without exposing credentials to the browser.
 - Official usa06011 chart requests return 1-minute, 5-minute, and 60-minute scopes.
+- usa06011 minute-chart requests use the current date as the default as-of date; a seven-day lookback was proven to return candles ending at that older date.
 - Observed usa06011 timestamps with hours above 23 are parsed as Kiwoom US business-date plus extended KST hours; parsing failures and stale candles fail closed.
 - The liquidity dashboard separates browser-to-FastAPI WebSocket health from the broker FE/FT observation state.
 - Advisory BUY_WATCH or SELL_WATCH is eligible only while the US session is active, FE/FT is connected and no older than 10 seconds, and all three official chart timeframes are present.
 - Off-hours, stale, reconnecting, missing, or degraded evidence forces WATCH; executionAuthorized remains false.
-- Latest verification: 385 backend/trading-engine tests and 22 frontend tests passed; production build passed.
+- Latest verification: 386 backend/trading-engine tests and 22 frontend tests passed; production build passed.
 
 Last documentation audit: 2026-08-08  
 Repository: `strategy-pilot`  

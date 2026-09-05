@@ -286,6 +286,7 @@ function LiquidityAnalysisPanel({
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   {item.latestClose == null ? "종가 없음" : `$${item.latestClose.toLocaleString()}`} · {item.candleCount}봉
+                  {item.continuationComplete === false ? " · 추가 과거 데이터 있음" : ""}
                 </p>
               </div>
             ))}

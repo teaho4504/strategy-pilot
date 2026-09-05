@@ -39,7 +39,11 @@ class OfficialChartContextService:
                 if not chart.candles:
                     unavailable.append(label)
                     continue
-                items.append(_analyze_chart(chart.candles, label=label, scope=scope, tr_id=chart.trId))
+                items.append(_analyze_chart(
+                    chart.candles, label=label, scope=scope, tr_id=chart.trId,
+                    continuation_complete=chart.continuationComplete,
+                    continuation_pages=chart.continuationPages,
+                ))
             meta = {
                 "source": "kiwoom-usa06011" if items else "persisted-fe-fallback",
                 "requestedScopes": [scope for _, scope in TIMEFRAME_SCOPES],
@@ -55,7 +59,8 @@ class OfficialChartContextService:
         self._cache.clear()
 
 
-def _analyze_chart(candles: list[UsChartCandle], *, label: str, scope: str, tr_id: str) -> dict[str, object]:
+def _analyze_chart(candles: list[UsChartCandle], *, label: str, scope: str, tr_id: str,
+                   continuation_complete: bool, continuation_pages: int) -> dict[str, object]:
     normalized = [candle for candle in candles if candle.close > 0]
     closes = [float(candle.close) for candle in normalized]
     ema9, ema20 = _ema_last(closes, 9), _ema_last(closes, 20)
@@ -71,6 +76,7 @@ def _analyze_chart(candles: list[UsChartCandle], *, label: str, scope: str, tr_i
     return {
         "timeframe": label, "seconds": int(scope) * 60, "tickScope": scope,
         "trId": tr_id, "source": f"kiwoom-{tr_id}", "candleCount": len(normalized),
+        "continuationComplete": continuation_complete, "continuationPages": continuation_pages,
         "latestClose": latest, "ema9": ema9, "ema20": ema20,
         "changePct": round(change_pct, 3) if change_pct is not None else None,
         "trend": trend, "pullback": pullback, "dataSufficient": enough,

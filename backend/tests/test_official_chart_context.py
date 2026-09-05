@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 
 from app.schemas.market import UsChartCandle, UsChartResponse
 from app.services.official_chart_context_service import OfficialChartContextService
-from app.services.market_ranking_service import parse_kiwoom_us_candle_time
+from app.services.market_ranking_service import _default_chart_start, parse_kiwoom_us_candle_time
 
 
 def test_official_chart_context_requests_1_5_60_minute_scopes(monkeypatch):
@@ -29,6 +30,7 @@ def test_official_chart_context_requests_1_5_60_minute_scopes(monkeypatch):
     assert scopes == ["1", "5", "60"]
     assert [item["timeframe"] for item in items] == ["1m", "5m", "1h"]
     assert all(item["trId"] == "usa06011" for item in items)
+    assert all(item["continuationComplete"] is True for item in items)
     assert all(item["latestCandleAtUtc"] for item in items)
     assert items[0]["latestCandleAtUtc"] == "2026-09-04T03:02:00+00:00"
     assert items[0]["timestampConvention"] == "kiwoom-us-extended-kst-observed"
@@ -41,3 +43,8 @@ def test_kiwoom_extended_kst_chart_time_maps_to_us_market_time():
     assert parsed is not None
     assert parsed.isoformat() == "2026-08-29T03:44:00+09:00"
     assert parsed.astimezone().timestamp() > 0
+
+
+def test_minute_chart_default_uses_current_as_of_date():
+    assert _default_chart_start("minute", today=date(2026, 9, 5)) == "20260905"
+    assert _default_chart_start("day", today=date(2026, 9, 5)) == "20260309"

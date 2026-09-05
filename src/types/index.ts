@@ -299,6 +299,8 @@ export interface UsLiquidityTimeframe {
   latestCandleAt?: string | null;
   latestCandleAtUtc?: string | null;
   timestampConvention?: "kiwoom-us-extended-kst-observed";
+  continuationComplete?: boolean;
+  continuationPages?: number;
   candles: Array<{
     timestamp: string;
     open: number;

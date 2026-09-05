@@ -1208,14 +1208,18 @@ def _official_ranking_name_indicates_non_common_stock(value: str | None) -> bool
     return any(term in text for term in blocked_terms)
 
 
-def _default_chart_start(timeframe: str) -> str:
+def _default_chart_start(timeframe: str, *, today: date | None = None) -> str:
+    current = today or date.today()
+    if timeframe == "minute":
+        # usa06011 behaves as an as-of date: sending a seven-day lookback
+        # returns candles ending around that older date instead of a range.
+        return current.strftime("%Y%m%d")
     days = {
-        "minute": 7,
         "day": 180,
         "week": 730,
         "month": 1825,
     }.get(timeframe, 180)
-    return (date.today() - timedelta(days=days)).strftime("%Y%m%d")
+    return (current - timedelta(days=days)).strftime("%Y%m%d")
 
 
 def _map_us_chart_candle(row: dict[str, Any]) -> UsChartCandle:
