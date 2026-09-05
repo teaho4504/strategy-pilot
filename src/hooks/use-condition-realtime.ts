@@ -7,10 +7,15 @@ export interface ConditionRealtimeItem {
   selectedSeq: string | null;
   selectedName: string | null;
   connected: boolean;
+  registered: boolean;
   matchCount: number;
   matches: UsAutoTradeStrategyStatusItem["conditionMatches"];
   error: string | null;
   errorType?: string | null;
+  lastConnectedAt: string | null;
+  lastReceivedAt: string | null;
+  reconnectCount: number;
+  nextRetrySeconds: number | null;
 }
 
 interface ConditionSnapshot {

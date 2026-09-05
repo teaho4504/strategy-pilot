@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import suppress
 from dataclasses import dataclass, field
 import json
+import re
 import ssl
 import time
 from typing import Any
@@ -44,6 +45,11 @@ class _ConditionMonitorState:
     error: str | None = None
     error_type: str | None = None
     task: asyncio.Task[None] | None = None
+    registered: bool = False
+    last_connected_at: str | None = None
+    last_received_at: str | None = None
+    reconnect_count: int = 0
+    next_retry_seconds: int | None = None
 
 
 class UsConditionService:
@@ -301,14 +307,20 @@ class UsConditionService:
                 state
                 and state.task
                 and not state.task.done()
+                and state.registered
                 and response is not None
                 and state.error is None
             ),
+            "registered": bool(state and state.registered),
             "selectedSeq": response.selectedSeq if response else normalized_seq,
             "selectedName": response.selectedName if response else None,
             "matchCount": len(response.matches) if response else 0,
             "error": state.error if state else None,
             "errorType": state.error_type if state else None,
+            "lastConnectedAt": state.last_connected_at if state else None,
+            "lastReceivedAt": state.last_received_at if state else None,
+            "reconnectCount": state.reconnect_count if state else 0,
+            "nextRetrySeconds": state.next_retry_seconds if state else None,
         }
 
     def monitor_matches(self, seq: str | None) -> list[UsConditionSearchMatch]:
@@ -354,6 +366,9 @@ class UsConditionService:
             registered: dict[str | None, UsConditionItem] = {}
             registered_quotes: tuple[str, ...] = ()
             websocket: Any = None
+            for key, state in self._monitor_states.items():
+                if key[0] == session.session_token:
+                    state.registered = False
             try:
                 try:
                     async with websockets.connect(
@@ -372,6 +387,20 @@ class UsConditionService:
                         list_response = await _receive_condition_message(websocket, timeout=10)
                         conditions = _map_conditions(list_response)
                         schema_keys = {str(key) for key in list_response.keys()}
+                        if not conditions:
+                            await websocket.send(json.dumps(build_condition_list_request().body))
+                            retry_list_response = await _receive_condition_message(websocket, timeout=10)
+                            conditions = _map_conditions(retry_list_response)
+                            schema_keys.update(str(key) for key in retry_list_response.keys())
+                        if (
+                            not conditions
+                            and self._condition_catalog_key == session.session_token
+                            and self._condition_catalog is not None
+                            and self._condition_catalog.conditions
+                        ):
+                            conditions = list(self._condition_catalog.conditions)
+                        if not conditions:
+                            raise UsConditionSearchError("Kiwoom condition search response was not received")
                         self._condition_catalog = UsConditionSearchResponse(
                             source="kiwoom-us-condition-list",
                             listTrId="usa20280",
@@ -387,6 +416,20 @@ class UsConditionService:
                         )
                         self._condition_catalog_key = session.session_token
                         self._condition_catalog_at = time.monotonic()
+
+                        cleanup_seqs = {
+                            selected.seq
+                            for key, _state in self._monitor_states.items()
+                            if key[0] == session.session_token
+                            for selected in [_select_condition(conditions, key[1])]
+                            if selected is not None
+                        }
+                        for cleanup_seq in sorted(cleanup_seqs):
+                            await websocket.send(json.dumps(build_condition_clear_request(cleanup_seq).body))
+                            try:
+                                await _receive_condition_message(websocket, timeout=2)
+                            except (asyncio.TimeoutError, UsConditionSearchError):
+                                pass
 
                         while True:
                             active_states = {
@@ -414,10 +457,7 @@ class UsConditionService:
                             ]
                             if registered and pending:
                                 raise _ConditionMonitorRefresh
-                            pending_registrations: list[
-                                tuple[str | None, _ConditionMonitorState, UsConditionItem]
-                            ] = []
-                            for requested_seq, state in pending:
+                            for index, (requested_seq, state) in enumerate(pending):
                                 selected = _select_condition(conditions, requested_seq)
                                 if selected is None:
                                     state.error = "Kiwoom condition search sequence was not found"
@@ -438,13 +478,36 @@ class UsConditionService:
                                     matches,
                                     response_schema_keys,
                                 )
-                                pending_registrations.append((requested_seq, state, selected))
-                            for requested_seq, state, selected in pending_registrations:
                                 await websocket.send(
                                     json.dumps(build_condition_search_request(selected.seq, realtime=True).body)
                                 )
                                 registered[requested_seq] = selected
+                                state.registered = True
+                                state.last_connected_at = now_iso()
+                                state.next_retry_seconds = None
                                 state.ready.set()
+                                if index < len(pending) - 1:
+                                    try:
+                                        registration_response = await _receive_condition_message(websocket, timeout=2)
+                                    except asyncio.TimeoutError:
+                                        registration_response = {}
+                                    if registration_response:
+                                        response_schema_keys = set(
+                                            state.response.schemaKeys if state.response else schema_keys
+                                        )
+                                        response_schema_keys.update(str(key) for key in registration_response.keys())
+                                        registration_matches = _merge_condition_matches(
+                                            list(state.response.matches if state.response else []),
+                                            _map_matches(registration_response),
+                                        )
+                                        self._store_monitor_response(
+                                            state,
+                                            requested_seq,
+                                            conditions,
+                                            selected,
+                                            registration_matches,
+                                            response_schema_keys,
+                                        )
 
                             if desired_quotes and desired_quotes != registered_quotes:
                                 await websocket.send(
@@ -518,12 +581,18 @@ class UsConditionService:
                 for key, state in self._monitor_states.items():
                     if key[0] != session.session_token:
                         continue
+                    state.registered = False
                     state.error = _safe_condition_error(exc)
                     state.error_type = exc.__class__.__name__
+                    state.reconnect_count += 1
+                    state.next_retry_seconds = 2
                     state.ready.set()
                     self._sync_legacy_state(state)
                 await asyncio.sleep(2)
                 self._quote_next_retry_seconds = None
+                for key, state in self._monitor_states.items():
+                    if key[0] == session.session_token:
+                        state.next_retry_seconds = None
 
     def _store_monitor_response(
         self,
@@ -555,6 +624,7 @@ class UsConditionService:
         )
         state.error = None
         state.error_type = None
+        state.last_received_at = state.response.updatedAt
         self._last_good_responses[state.key] = state.response
         self._cached_response = state.response
         self._cached_seq = seq
@@ -666,7 +736,9 @@ async def _receive_condition_message(websocket: Any, *, timeout: float) -> dict[
             await websocket.send(json.dumps(message))
             continue
         if message.get("return_code") not in (0, "0", None):
-            raise UsConditionSearchError("Kiwoom condition search request failed")
+            raw_code = str(message.get("return_code", ""))
+            safe_code = raw_code if re.fullmatch(r"-?\d{1,10}", raw_code) else "unknown"
+            raise UsConditionSearchError(f"Kiwoom condition search request failed (code {safe_code})")
         return message
     raise UsConditionSearchError("Kiwoom condition search response was not received")
 
@@ -902,6 +974,8 @@ def _safe_condition_error(exc: Exception) -> str:
             "Kiwoom condition search sequence was not found",
         }
         message = str(exc)
+        if re.fullmatch(r"Kiwoom condition search request failed \(code (?:-?\d{1,10}|unknown)\)", message):
+            return message
         return message if message in known_messages else "Kiwoom condition search websocket unavailable"
     if isinstance(exc, ssl.SSLError):
         return "Kiwoom condition search websocket SSL verification failed"

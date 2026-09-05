@@ -311,9 +311,19 @@ class UsOrderService:
             condition
             for condition in conditions
             if kiwoom_condition_strategy_service.is_enabled(condition.seq)
-            and not bool(us_condition_service.monitor_status(condition.seq)["active"])
         ]
-        for condition in enabled_conditions:
+        primary_condition = enabled_conditions[0] if enabled_conditions else None
+        for condition in enabled_conditions[1:]:
+            await us_condition_service.stop_condition_monitor(condition.seq)
+            _auto_trade_strategy_condition_errors[
+                kiwoom_condition_strategy_service.strategy_id(condition.seq)
+            ] = "현재 키움 세션의 실시간 조건 슬롯은 1개입니다. 다른 조건식을 먼저 OFF로 전환하세요."
+        pending_conditions = [
+            condition
+            for condition in ([primary_condition] if primary_condition is not None else [])
+            if not bool(us_condition_service.monitor_status(condition.seq)["active"])
+        ]
+        for condition in pending_conditions:
             try:
                 await us_condition_service.get_condition_search(condition.seq)
                 _auto_trade_strategy_condition_errors.pop(
@@ -383,9 +393,14 @@ class UsOrderService:
             conditionSeq=str(monitor["selectedSeq"] or condition_seq),
             conditionName=str(monitor["selectedName"] or condition_name),
             conditionConnected=bool(monitor["active"]),
+            conditionRegistered=bool(monitor.get("registered", monitor["active"])),
             conditionMatchCount=int(monitor["matchCount"]),
             conditionMatches=us_condition_service.monitor_matches(condition_seq) if enabled else [],
             conditionError=condition_error,
+            conditionLastConnectedAt=monitor.get("lastConnectedAt"),
+            conditionLastReceivedAt=monitor.get("lastReceivedAt"),
+            conditionReconnectCount=int(monitor.get("reconnectCount") or 0),
+            conditionNextRetrySeconds=monitor.get("nextRetrySeconds"),
         )
 
     @staticmethod

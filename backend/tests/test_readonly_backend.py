@@ -3750,10 +3750,15 @@ def test_realtime_condition_websocket_pushes_shared_monitor_snapshot(monkeypatch
         def monitor_status(self, seq):
             return {
                 "active": True,
+                "registered": True,
                 "selectedSeq": seq,
                 "selectedName": "HTS 급등 조건",
                 "matchCount": 1,
                 "error": None,
+                "lastConnectedAt": "2026-09-05T10:00:00+09:00",
+                "lastReceivedAt": "2026-09-05T10:00:01+09:00",
+                "reconnectCount": 0,
+                "nextRetrySeconds": None,
             }
 
         def monitor_matches(self, seq):
@@ -3777,6 +3782,8 @@ def test_realtime_condition_websocket_pushes_shared_monitor_snapshot(monkeypatch
     assert authenticated["readOnly"] is True
     assert snapshot["type"] == "CONDITION_SNAPSHOT"
     assert snapshot["items"][0]["connected"] is True
+    assert snapshot["items"][0]["registered"] is True
+    assert snapshot["items"][0]["reconnectCount"] == 0
     assert snapshot["items"][0]["matches"][0]["code"] == "NVDA"
 
 
@@ -3962,6 +3969,7 @@ def test_us_condition_monitor_keeps_realtime_registration_until_stopped(monkeypa
             self.responses = [
                 {"trnm": "LOGIN", "return_code": 0},
                 {"trnm": "GCNSRLST", "return_code": 0, "data": [["001", "US_COMMON_LIQUID_LONG"]]},
+                {"trnm": "GCNSRCLR", "return_code": 0, "seq": "001"},
                 {"trnm": "GCNSRREQ", "return_code": 0, "data": [{"jmcode": "AAA", "stex_tp": "ND"}]},
             ]
 
@@ -4009,12 +4017,89 @@ def test_us_condition_monitor_keeps_realtime_registration_until_stopped(monkeypa
 
     assert [(packet["trnm"], packet.get("search_type")) for packet in packets_before_stop[1:]] == [
         ("GCNSRLST", None),
+        ("GCNSRCLR", None),
         ("GCNSRREQ", "0"),
         ("GCNSRREQ", "1"),
     ]
     assert socket.sent[-1]["trnm"] == "GCNSRCLR"
     assert response is not None
     assert {item.code for item in response.matches} == {"AAA"}
+
+
+def test_us_condition_monitor_uses_same_session_catalog_when_socket_list_is_empty(monkeypatch):
+    import json
+
+    from app.schemas.market import UsConditionItem, UsConditionSearchResponse
+    from app.services.us_condition_service import UsConditionService
+
+    class FakeSocket:
+        def __init__(self):
+            self.sent: list[dict[str, object]] = []
+            self.responses = [
+                {"trnm": "LOGIN", "return_code": 0},
+                {"trnm": "GCNSRLST", "return_code": 0, "data": []},
+                {"trnm": "GCNSRLST", "return_code": 0, "data": []},
+                {"trnm": "GCNSRCLR", "return_code": 0, "seq": "001"},
+                {"trnm": "GCNSRREQ", "return_code": 0, "data": [{"jmcode": "AAA"}]},
+            ]
+
+        async def send(self, payload: str):
+            self.sent.append(json.loads(payload))
+
+        async def recv(self):
+            if self.responses:
+                return json.dumps(self.responses.pop(0))
+            await asyncio.Future()
+
+    socket = FakeSocket()
+
+    class FakeContext:
+        async def __aenter__(self):
+            return socket
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeWebsockets:
+        @staticmethod
+        def connect(*args, **kwargs):
+            return FakeContext()
+
+    monkeypatch.setitem(sys.modules, "websockets", FakeWebsockets)
+    service = UsConditionService()
+    service._condition_catalog_key = "session-token"
+    service._condition_catalog = UsConditionSearchResponse(
+        source="kiwoom-us-condition-list",
+        listTrId="usa20280",
+        searchTrId="usa20281",
+        realtimeTrId="usa20290",
+        clearTrId="usa20291",
+        updatedAt="2026-09-05T10:00:00+09:00",
+        conditions=[UsConditionItem(seq="001", name="CACHED")],
+        matches=[],
+        schemaKeys=[],
+    )
+    session = KiwoomSession(
+        session_token="session-token",
+        mode="live",
+        account_no="configured",
+        base_url="https://api.kiwoom.com",
+        access_token="fixture-token",
+        expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
+    )
+
+    async def run_test():
+        await service.ensure_realtime_monitor(session, "001")
+        status = service.monitor_status("001")
+        await service.stop_realtime_monitor()
+        return status
+
+    status = asyncio.run(run_test())
+
+    assert status["registered"] is True
+    assert status["active"] is True
+    assert status["matchCount"] == 1
+    assert [packet["trnm"] for packet in socket.sent].count("GCNSRLST") == 2
 
 
 def test_us_realtime_hub_registers_quotes_and_conditions_on_one_websocket(monkeypatch):
@@ -4032,6 +4117,7 @@ def test_us_realtime_hub_registers_quotes_and_conditions_on_one_websocket(monkey
                     "return_code": 0,
                     "data": [["001", "US_COMMON_LIQUID_LONG"]],
                 },
+                {"trnm": "GCNSRCLR", "return_code": 0, "seq": "001"},
                 {
                     "trnm": "GCNSRREQ",
                     "return_code": 0,
@@ -4118,7 +4204,10 @@ def test_us_condition_monitor_reuses_one_websocket_for_multiple_sequences(monkey
                     "return_code": 0,
                     "data": [["0", "FIRST"], ["2", "BREAKOUT"]],
                 },
+                {"trnm": "GCNSRCLR", "return_code": 0, "seq": "0"},
+                {"trnm": "GCNSRCLR", "return_code": 0, "seq": "2"},
                 {"trnm": "GCNSRREQ", "return_code": 0, "seq": "0", "data": [{"jmcode": "AAA"}]},
+                {"trnm": "GCNSRREQ", "return_code": 0, "seq": "0", "data": []},
                 {"trnm": "GCNSRREQ", "return_code": 0, "seq": "2", "data": [{"jmcode": "BBB"}]},
             ]
 
@@ -4173,9 +4262,13 @@ def test_us_condition_monitor_reuses_one_websocket_for_multiple_sequences(monkey
     assert [(packet["trnm"], packet.get("seq"), packet.get("search_type")) for packet in socket.sent[:6]] == [
         ("LOGIN", None, None),
         ("GCNSRLST", None, None),
+        ("GCNSRCLR", "0", None),
+        ("GCNSRCLR", "2", None),
         ("GCNSRREQ", "0", "0"),
-        ("GCNSRREQ", "2", "0"),
         ("GCNSRREQ", "0", "1"),
+    ]
+    assert [(packet["trnm"], packet.get("seq"), packet.get("search_type")) for packet in socket.sent[6:8]] == [
+        ("GCNSRREQ", "2", "0"),
         ("GCNSRREQ", "2", "1"),
     ]
 

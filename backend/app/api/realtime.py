@@ -223,6 +223,7 @@ async def realtime_us_conditions_websocket(websocket: WebSocket) -> None:
                         "selectedSeq": status.get("selectedSeq"),
                         "selectedName": status.get("selectedName"),
                         "connected": bool(status.get("active")),
+                        "registered": bool(status.get("registered")),
                         "matchCount": int(status.get("matchCount") or 0),
                         "matches": [
                             match.model_dump()
@@ -230,6 +231,10 @@ async def realtime_us_conditions_websocket(websocket: WebSocket) -> None:
                         ],
                         "error": status.get("error"),
                         "errorType": status.get("errorType"),
+                        "lastConnectedAt": status.get("lastConnectedAt"),
+                        "lastReceivedAt": status.get("lastReceivedAt"),
+                        "reconnectCount": int(status.get("reconnectCount") or 0),
+                        "nextRetrySeconds": status.get("nextRetrySeconds"),
                     }
                 )
             await websocket.send_json(

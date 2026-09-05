@@ -175,6 +175,7 @@ export interface UsAutoTradeStrategyStatusItem {
   conditionSeq: string | null;
   conditionName: string | null;
   conditionConnected: boolean;
+  conditionRegistered: boolean;
   conditionMatchCount: number;
   conditionMatches: Array<{
     code: string;
@@ -185,6 +186,10 @@ export interface UsAutoTradeStrategyStatusItem {
     volume: number | null;
   }>;
   conditionError: string | null;
+  conditionLastConnectedAt: string | null;
+  conditionLastReceivedAt: string | null;
+  conditionReconnectCount: number;
+  conditionNextRetrySeconds: number | null;
 }
 
 export interface UsAutoTradeStrategyStatus {

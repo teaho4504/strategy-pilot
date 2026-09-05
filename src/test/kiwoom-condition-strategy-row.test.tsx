@@ -16,9 +16,14 @@ describe("ConditionStrategyRow", () => {
           conditionSeq: "007",
           conditionName: "HTS 급등 조건",
           conditionConnected: true,
+          conditionRegistered: true,
           conditionMatchCount: 12,
           conditionMatches: [{ code: "NVDA", name: "NVIDIA", exchange: "ND", price: 100, changeRate: 2, volume: 1_000_000 }],
           conditionError: null,
+          conditionLastConnectedAt: "2026-09-05T10:00:00+09:00",
+          conditionLastReceivedAt: "2026-09-05T10:00:01+09:00",
+          conditionReconnectCount: 0,
+          conditionNextRetrySeconds: null,
         }}
         expanded={false}
         toggling={false}
@@ -43,9 +48,14 @@ describe("ConditionStrategyRow", () => {
           conditionSeq: "007",
           conditionName: "HTS 급등 조건",
           conditionConnected: true,
+          conditionRegistered: true,
           conditionMatchCount: 12,
           conditionMatches: [{ code: "NVDA", name: "NVIDIA", exchange: "ND", price: 100, changeRate: 2, volume: 1_000_000 }],
           conditionError: null,
+          conditionLastConnectedAt: "2026-09-05T10:00:00+09:00",
+          conditionLastReceivedAt: "2026-09-05T10:00:01+09:00",
+          conditionReconnectCount: 0,
+          conditionNextRetrySeconds: null,
         }}
         expanded
         toggling={false}
@@ -55,7 +65,9 @@ describe("ConditionStrategyRow", () => {
     );
 
     expect(screen.getByText("현재 편입 종목")).toBeInTheDocument();
-    expect(screen.getByText("WebSocket")).toBeInTheDocument();
+    expect(screen.getByText("백엔드 WebSocket")).toBeInTheDocument();
+    expect(screen.getByText("키움 조건식 등록")).toBeInTheDocument();
+    expect(screen.getByText("등록됨")).toBeInTheDocument();
     expect(screen.getByText("NVIDIA")).toBeInTheDocument();
     expect(screen.getByText("NVDA · ND")).toBeInTheDocument();
     expect(screen.queryByText("usa20280")).not.toBeInTheDocument();

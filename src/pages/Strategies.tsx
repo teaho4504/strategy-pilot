@@ -63,7 +63,7 @@ export default function Strategies() {
   );
   const enabledSeqs = useMemo(
     () => baseRows
-      .filter((item) => item.enabled && item.conditionSeq)
+      .filter((item) => item.enabled && item.conditionSeq && !item.conditionError)
       .map((item) => item.conditionSeq as string),
     [baseRows],
   );
@@ -83,9 +83,14 @@ export default function Strategies() {
         conditionSeq: live.selectedSeq ?? status.conditionSeq,
         conditionName: live.selectedName ?? status.conditionName,
         conditionConnected: live.connected,
+        conditionRegistered: live.registered,
         conditionMatchCount: live.matchCount,
         conditionMatches: live.matches,
         conditionError: live.error,
+        conditionLastConnectedAt: live.lastConnectedAt,
+        conditionLastReceivedAt: live.lastReceivedAt,
+        conditionReconnectCount: live.reconnectCount,
+        conditionNextRetrySeconds: live.nextRetrySeconds,
       };
     }),
     [baseRows, conditionRealtime.items],
@@ -128,7 +133,7 @@ export default function Strategies() {
                   enabledCount === 0
                     ? "WebSocket 감시 없음"
                     : conditionRealtime.state === "connected"
-                      ? "WebSocket " + connectedCount + "/" + enabledCount + " 연결"
+                      ? "키움 등록 " + connectedCount + "/" + enabledCount + " · 백엔드 연결"
                       : "WebSocket 재연결 중"
                 }
               </p>
@@ -535,7 +540,7 @@ export function ConditionStrategyRow({
 
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex items-center justify-between gap-3 rounded-lg border border-foreground/30 bg-surface-3/70 px-3 py-3 text-xs shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.07)] sm:text-sm">
-          <span className="truncate font-medium">키움 실시간 조건검색</span>
+          <span className="truncate font-medium">키움 실시간 조건식 등록</span>
           <span className={cn(
             "shrink-0 font-semibold",
             status.conditionConnected ? "text-success" : status.conditionError ? "text-danger" : "text-muted-foreground",
@@ -567,10 +572,22 @@ export function ConditionStrategyRow({
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-lg border border-foreground/15 bg-background/30 px-3 py-2.5 text-[11px]">
             <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Wifi className="h-3.5 w-3.5" /> WebSocket
+              <Wifi className="h-3.5 w-3.5" /> 백엔드 WebSocket
             </span>
             <span className="text-right font-semibold">
-              {status.conditionConnected ? "연결됨" : status.conditionError ? "오류" : "연결 대기"}
+              연결됨
+            </span>
+            <span className="text-muted-foreground">키움 조건식 등록</span>
+            <span className="text-right font-semibold">
+              {status.conditionRegistered ? "등록됨" : status.conditionError ? "오류" : "등록 대기"}
+            </span>
+            <span className="text-muted-foreground">키움 연결 시각</span>
+            <span className="text-right font-semibold">{formatSyncTime(status.conditionLastConnectedAt)}</span>
+            <span className="text-muted-foreground">최근 조건 데이터</span>
+            <span className="text-right font-semibold">{formatSyncTime(status.conditionLastReceivedAt)}</span>
+            <span className="text-muted-foreground">재연결 횟수</span>
+            <span className="text-right font-semibold">
+              {status.conditionReconnectCount}회{status.conditionNextRetrySeconds != null ? ` · ${status.conditionNextRetrySeconds}초 후` : ""}
             </span>
             <span className="text-muted-foreground">마지막 동기화</span>
             <span className="text-right font-semibold">{formatSyncTime(updatedAt)}</span>

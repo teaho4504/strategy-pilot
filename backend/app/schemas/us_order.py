@@ -308,9 +308,14 @@ class UsAutoTradeStrategyStatusItem(BaseModel):
     conditionSeq: str | None = None
     conditionName: str | None = None
     conditionConnected: bool = False
+    conditionRegistered: bool = False
     conditionMatchCount: int = 0
     conditionMatches: list[UsConditionSearchMatch] = Field(default_factory=list)
     conditionError: str | None = None
+    conditionLastConnectedAt: str | None = None
+    conditionLastReceivedAt: str | None = None
+    conditionReconnectCount: int = 0
+    conditionNextRetrySeconds: int | None = None
 
 
 class UsAutoTradeStrategyStatusResponse(BaseModel):
