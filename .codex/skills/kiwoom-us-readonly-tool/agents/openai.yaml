@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kiwoom US Read-only Tool"
+  short_description: "Maintain the safe Kiwoom US stock research tool"
+  default_prompt: "Use $kiwoom-us-readonly-tool to update the Kiwoom US stock read-only tool from the official TR specification."

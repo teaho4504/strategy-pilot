@@ -1,22 +1,20 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { Home, Layers, ListChecks, BarChart3, Settings } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { Home, Layers, BarChart3, Settings, Activity, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { to: "/", label: "홈", icon: Home, end: true },
+  { to: "/quotes", label: "시세", icon: Activity },
   { to: "/strategies", label: "전략", icon: Layers },
-  { to: "/orders", label: "주문", icon: ListChecks },
   { to: "/analytics", label: "분석", icon: BarChart3 },
+  { to: "/agents", label: "AI", icon: Bot },
   { to: "/settings", label: "설정", icon: Settings },
 ];
 
 export function BottomNav() {
-  const { pathname } = useLocation();
-  // Hide on builder full-screen
-  if (pathname.startsWith("/strategies/builder")) return null;
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface-1/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface-1/95 backdrop-blur md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="하단 내비게이션"
     >

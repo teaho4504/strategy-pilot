@@ -1,39 +1,31 @@
-# AutoTrader KR — 자동매매 데모 대시보드
+# Strategy Pilot
 
-개인용 한국 주식 자동매매 운영 대시보드의 **프론트엔드 프로토타입**입니다. 모바일 퍼스트 다크 테마, TypeScript, Vite/React/Tailwind/shadcn 기반. 모든 데이터는 **모의(mock)** 이며 실제 증권사 API 연동·실주문·로그인은 포함되지 않습니다.
+키움 REST API 기반 미국주식 읽기 전용 분석·자동화 대시보드입니다.
 
-## 디렉토리 구조 (핸드오프)
+## Runtime Policy
 
+- 런타임 데이터는 서버를 통과한 키움 REST/WebSocket 조회 응답만 사용합니다.
+- Mock/Paper 데이터와 자동 fallback은 제공하지 않습니다.
+- 키움 연결 실패 시 화면에 오류를 표시하며 가짜 잔고·시세·체결을 만들지 않습니다.
+- App Key, Secret Key, 접근 토큰과 계좌번호는 브라우저 코드에 저장하지 않습니다.
+- 실주문·정정·취소·환전 신청은 구현 기준선에서 차단합니다.
+- 전략 저장과 전략 ON은 주문 차단을 우회하지 않습니다.
+
+## Local URLs
+
+- Frontend: `http://127.0.0.1:8080`
+- Backend: `http://127.0.0.1:8000`
+
+## Windows Kiwoom CLI
+
+공식 `kwcli` 프로필 인증을 사용합니다. 프로필 메타데이터는 Windows AppData에, App Key와 Secret Key는 Windows 자격 증명 관리자에 보관되며 브라우저로 전달되지 않습니다.
+
+```powershell
+kiwoomcli setup
+kiwoomcli auth status
+powershell -ExecutionPolicy Bypass -File .\tools\check-kiwoom-windows.ps1
 ```
-src/
-├── pages/                # 라우트별 화면 (Home, Strategies, Builder, Orders, Analytics, Settings)
-├── components/
-│   ├── layout/           # AppShell, TopBar, BottomNav
-│   ├── common/           # Card, DemoBadge, DeltaPct ...
-│   ├── home/             # 홈 대시보드 위젯
-│   └── ui/               # shadcn 프리미티브
-├── services/
-│   ├── adapters.ts       # 🔌 UI ↔ 데이터 어댑터 (이 파일만 교체하면 실연동)
-│   └── mock/data.ts      # 데모 데이터 단일 소스
-├── types/                # 도메인 타입 (Portfolio, Strategy, Order ...)
-├── store/                # zustand 앱 상태 (자동매매 on/off, 선택 계좌)
-└── lib/                  # format, utils
-```
 
-## 실연동 시 주의 (반드시 읽기)
+CLI 설치와 백엔드 구성은 [backend/README.md](backend/README.md)를 참고하세요. 실주문·정정·취소는 계속 차단됩니다.
 
-1. **주문 실행은 서버 측 워커에서만**. 대시보드는 내부 API(`/api/*`)만 호출하도록 유지.
-2. **증권사 API 키/시크릿은 프론트엔드 코드·환경변수에 절대 포함하지 말 것.** 서버 사이드 시크릿 매니저 사용.
-3. `src/services/adapters.ts`의 시그니처를 유지한 채로 HTTP/SSE 클라이언트로 교체. 타입(`src/types`)을 공유 패키지로 이관 권장.
-4. Kill Switch, 일일 손실 한도, 동시 보유 종목 수 등 안전 한도는 **서버에서도 강제** 해야 함. 클라이언트만 신뢰 금지.
-5. PWA·모바일 안전영역(safe-area-inset)을 고려한 레이아웃. Vercel 배포 시 SPA fallback 설정 필요.
-
-## 디자인 토큰
-
-전 색상/그라데이션/섀도/타이포는 `src/index.css`의 HSL 시맨틱 토큰 + `tailwind.config.ts`로 관리. 컴포넌트에서 `text-white`, `bg-[#...]` 등 하드코딩 금지.
-
-## 데모 안전장치
-
-- 기본 상태: `모의투자 · 자동매매 일시정지`
-- 모든 토글·Kill Switch는 확인 모달 후 동작
-- 수동 주문 UI는 비활성화 (전략 발동 주문만)
+공식 명세 기반 미국주식 TR 카탈로그와 안전한 확장 절차는 [docs/KIWOOM_US_TOOL_OVERVIEW.md](docs/KIWOOM_US_TOOL_OVERVIEW.md)를 참고하세요.

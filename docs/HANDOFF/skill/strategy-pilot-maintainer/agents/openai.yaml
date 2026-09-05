@@ -1,0 +1,4 @@
+interface:
+  display_name: "Strategy Pilot Maintainer"
+  short_description: "Safely continue the Strategy Pilot trading dashboard"
+  default_prompt: "Inspect the Strategy Pilot repository, preserve its fail-closed trading safeguards, and continue the requested backend/frontend work with tests."

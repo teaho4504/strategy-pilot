@@ -1,0 +1,12 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+httpx>=0.27,<1
+python-dotenv>=1,<2
+pydantic>=2,<3
+PyJWT[crypto]>=2.8,<3
+keyring>=25,<26
+platformdirs>=4.9,<5
+certifi>=2024
+websockets>=13,<17
+pytest>=8,<9
+tzdata>=2025.2
