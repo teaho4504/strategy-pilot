@@ -6,6 +6,7 @@
 - `/verify` 실매매 체결 검증: 매수→매도→잔고·원장 7개 항목 대조 + 사용자 수행 절차
 - 데이터: 기본 mock. `VITE_US_API_BASE` 설정 시 `/api/health`, `/api/us/orders/control/status`만 실서버 **조회(GET)**. 주문 기능 없음
 - 실서버(FastAPI 백엔드, 키움 해외 TR)는 Mac 로컬 저장소에 있으며 이 저장소에는 아직 반영되지 않음
+- 실매매 잠금 해제·복귀 규칙: [`docs/OPERATING_PROTOCOL.md`](docs/OPERATING_PROTOCOL.md) (`자동매매 시작 요청` / `자동매매 종료 요청`)
 
 ---
 
