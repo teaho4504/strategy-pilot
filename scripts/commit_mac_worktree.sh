@@ -32,6 +32,8 @@ IGNORE_LINES=(
   "*.p12"
   ".env.*"
   "!.env.example"
+  "outputs/"
+  "pnpm-lock.yaml"
 )
 for l in "${IGNORE_LINES[@]}"; do
   grep -qxF "$l" .gitignore || { [ $APPLY -eq 1 ] && echo "$l" >> .gitignore; echo "+ .gitignore: $l"; }
