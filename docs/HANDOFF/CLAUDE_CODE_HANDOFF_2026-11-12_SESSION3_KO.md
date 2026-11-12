@@ -11,7 +11,7 @@
 | GitHub 브랜치 정리 | **완료.** 남은 브랜치: `main`, `claude/happy-tesla-tuq30m`, `feature/kiwoom-us-tr-skeleton-local` |
 | 정리 전 백업 | 원격 태그 `archive/*-20261112` 11개(원래 커밋과 일치 확인) + Mac `~/strategy-pilot-all-branches-20261112.bundle` |
 | Mac 미커밋 변경 | **329건 그대로 미커밋.** GitHub의 Mac 브랜치는 7/11 커밋 `a6689d2`뿐. 커밋은 사용자 결정으로 보류 |
-| Mac `.gitignore` | 커밋 스크립트가 15줄 추가(수정 상태, 미커밋). 서버 실행에는 영향 없음 |
+| Mac `.gitignore` | 커밋 스크립트(`--apply` 첫 시도)가 13줄 추가(수정 상태, 미커밋). 서버 실행에는 영향 없음 |
 | 실주문 설정 재시작 | `live_on.sh` 실행 완료. 백엔드 `127.0.0.1:8000` 기동, `/api/health` 200 |
 | 실주문 플래그 확인 | **미확인.** `curl /api/health` 결과(`readOnly:false`, `orderEnabled:true`) 미보고 |
 | 팀 자동매매 ON·실매매 체결 | 미보고 (사용자 진행 여부 미확인) |
