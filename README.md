@@ -1,4 +1,15 @@
-# AutoTrader KR — 자동매매 데모 대시보드
+# Strategy Pilot — 미국 주식 운영 콘솔 (프로토타입)
+
+> **최신 현황:** [`docs/STATUS_2026-11-12.md`](docs/STATUS_2026-11-12.md) · 인계서 [`docs/HANDOFF/CLAUDE_CODE_HANDOFF_2026-11-12_SESSION2_KO.md`](docs/HANDOFF/CLAUDE_CODE_HANDOFF_2026-11-12_SESSION2_KO.md)
+
+- `/` 운영 콘솔: 2팀 TOP10 · 종목 상세 · 주문 게이트(잠금/차단/가능) · 세션 키퍼
+- `/verify` 실매매 체결 검증: 매수→매도→잔고·원장 7개 항목 대조 + 사용자 수행 절차
+- 데이터: 기본 mock. `VITE_US_API_BASE` 설정 시 `/api/health`, `/api/us/orders/control/status`만 실서버 **조회(GET)**. 주문 기능 없음
+- 실서버(FastAPI 백엔드, 키움 해외 TR)는 Mac 로컬 저장소에 있으며 이 저장소에는 아직 반영되지 않음
+
+---
+
+## (구) AutoTrader KR 데모 — `/kr-demo`
 
 개인용 한국 주식 자동매매 운영 대시보드의 **프론트엔드 프로토타입**입니다. 모바일 퍼스트 다크 테마, TypeScript, Vite/React/Tailwind/shadcn 기반. 모든 데이터는 **모의(mock)** 이며 실제 증권사 API 연동·실주문·로그인은 포함되지 않습니다.
 

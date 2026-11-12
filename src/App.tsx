@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import Home from "./pages/Home";
+import UsConsole from "./pages/UsConsole";
+import Verify from "./pages/Verify";
 import Strategies from "./pages/Strategies";
 import StrategyBuilder from "./pages/StrategyBuilder";
 import Orders from "./pages/Orders";
@@ -27,7 +29,9 @@ const App = () => (
       <BrowserRouter>
         <AppShell>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<UsConsole />} />
+            <Route path="/verify" element={<Verify />} />
+            <Route path="/kr-demo" element={<Home />} />
             <Route path="/strategies" element={<Strategies />} />
             <Route path="/strategies/builder" element={<StrategyBuilder />} />
             <Route path="/orders" element={<Orders />} />

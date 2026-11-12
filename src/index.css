@@ -11,7 +11,7 @@
 @layer base {
   :root {
     /* Surfaces */
-    --background: 220 14% 5%;            /* near-black */
+    --background: 216 19% 5%;            /* near-black (WTS) */
     --surface-1: 220 12% 8%;             /* app shell */
     --surface-2: 220 11% 11%;            /* card */
     --surface-3: 220 10% 14%;            /* elevated / bottom sheet */
@@ -27,12 +27,12 @@
     --border: 220 10% 18%;
     --border-strong: 220 10% 24%;
     --input: 220 10% 18%;
-    --ring: 158 70% 50%;
+    --ring: 218 100% 65%;
 
     /* Brand / primary — emerald, distinctive for finance */
-    --primary: 158 72% 48%;
+    --primary: 218 100% 65%;
     --primary-foreground: 220 14% 6%;
-    --primary-glow: 158 80% 60%;
+    --primary-glow: 218 100% 74%;
 
     --secondary: 220 10% 16%;
     --secondary-foreground: 210 20% 96%;
@@ -41,10 +41,10 @@
     --accent-foreground: 220 14% 6%;
 
     /* Market semantics — KR convention: up red, down blue */
-    --up: 358 78% 60%;
+    --up: 355 86% 60%;
     --up-foreground: 0 0% 100%;
     --up-soft: 358 60% 16%;
-    --down: 218 90% 62%;
+    --down: 215 92% 58%;
     --down-foreground: 0 0% 100%;
     --down-soft: 218 60% 18%;
     --flat: 220 8% 55%;
@@ -63,7 +63,7 @@
       system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
 
-    --radius: 0.875rem; /* 14px */
+    --radius: 0.75rem; /* 12px */
 
     /* Gradients & shadows */
     --gradient-up: linear-gradient(135deg, hsl(358 78% 60% / 0.18), hsl(358 78% 60% / 0));
@@ -118,6 +118,13 @@
   .card-base {
     @apply rounded-2xl border border-border bg-card p-4;
     box-shadow: var(--shadow-card);
+  }
+
+  .wts-panel {
+    @apply rounded-xl border border-border bg-card p-3;
+  }
+  .wts-pill {
+    @apply inline-flex items-center gap-1 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-foreground/90;
   }
 
   .hairline { border-color: hsl(var(--border)); }

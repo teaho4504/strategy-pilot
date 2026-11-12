@@ -1,12 +1,12 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Layers, ListChecks, BarChart3, Settings } from "lucide-react";
+import { Home, ShieldCheck, Layers, ListChecks, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { to: "/", label: "홈", icon: Home, end: true },
+  { to: "/", label: "콘솔", icon: Home, end: true },
+  { to: "/verify", label: "검증", icon: ShieldCheck },
   { to: "/strategies", label: "전략", icon: Layers },
   { to: "/orders", label: "주문", icon: ListChecks },
-  { to: "/analytics", label: "분석", icon: BarChart3 },
   { to: "/settings", label: "설정", icon: Settings },
 ];
 
