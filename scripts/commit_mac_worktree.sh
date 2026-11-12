@@ -51,43 +51,66 @@ UNITS=(
   "deploy|chore(deploy): 배포 설정|deploy vercel.json"
 )
 
-# 3) 스테이징 전 비밀정보 검사 함수 (값은 출력하지 않음)
+# 3) 스테이징 후 비밀정보 검사 (값은 출력하지 않음, 도구 오류 시 실패 처리)
+#  - 키/토큰: 따옴표 안 16자 이상 리터럴만 (예: app_key = "…"). 변수 대입 코드(access_token = resp[...])는 제외
+#  - .env 계열 파일은 따옴표 없는 KEY=값 도 검사
+#  - test/dummy/fake/example/sample/mock/placeholder 등이 들어간 줄은 테스트 값으로 보고 제외 (PRIVATE KEY 제외)
+#  - 확인 후 가짜 값이면 SCAN_ALLOW="경로1,경로2" 로 해당 파일만 제외 가능 (PRIVATE KEY는 제외 불가)
+#  - 출력: 파일:줄 [종류] 가려진 줄 (리터럴·숫자는 «값»/«숫자»로 치환)
+KEYS='(app_?key|secret_?key|app_?secret|appsecret|access_?token|refresh_?token|password|passwd|admin_?pin|api_?key)'
+DUMMY='test|dummy|fake|example|sample|mock|placeholder|changeme|redacted|xxxx|your_|<[a-z_-]+>|\.\.\.'
+mask() {
+  sed -E -e 's/[0-9]{8}-[0-9]{2}/«계좌»/g' -e 's/[0-9]{4}-[0-9]{4}-[0-9]{2}/«계좌»/g' \
+         -e "s/([\"'])[A-Za-z0-9+/_.=-]{6,}([\"'])/\1«값»\2/g" -e 's/=([[:space:]]*)[^[:space:]"'"'"',)]{6,}/=\1«값»/g' \
+         -e 's/[0-9]{6,}/«숫자»/g' | cut -c1-140
+}
 scan() {
-  local bad=0
+  local bad=0 f size added hits="" rc kind re line out spec loc body
   # 금지 파일
   if git diff --cached --name-only | grep -E '(^|/)\.env($|\.)|\.sqlite3|\.redesign-backup|\.bundle$|\.pem$|\.p12$|/backups?/' | grep -v '\.env\.example$'; then
     echo "!! 금지 파일이 스테이징됨"; bad=1
   fi
-  # 큰 파일 (>2MB)
-  git diff --cached --name-only -z | xargs -0 -I{} sh -c '[ -f "{}" ] && [ $(wc -c < "{}") -gt 2097152 ] && echo "!! 2MB 초과: {}"' | grep . && bad=1
-  # 키·토큰·PIN·계좌번호 패턴 (추가된 줄만). 파일:줄 위치와 항목 종류만 출력, 값은 출력 안 함.
-  # 확인 결과 가짜 테스트 값이면 SCAN_ALLOW="경로1,경로2" 로 해당 파일만 제외 가능 (PRIVATE KEY는 제외 불가)
-  # awk는 위치 표시만, 정규식 판정은 grep -E (BSD/GNU 공통). 도구 오류 시 실패로 처리(fail-closed).
-  local added hits="" rc kind re line f out spec
-  added=$(git diff --cached -U0 | awk '
+  # 큰 파일 (>2MB) — xargs 길이 제한을 피하려고 한 줄씩 검사
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    size=$(wc -c < "$f" | tr -d ' ')
+    [ "$size" -gt 2097152 ] && { echo "!! 2MB 초과: $f (${size}B)"; bad=1; }
+  done <<EOF
+$(git diff --cached --name-only --diff-filter=AM)
+EOF
+  # 추가된 줄을 "파일:줄<TAB>내용" 으로 펼침
+  added=$(git diff --cached -U0 --no-color | awk '
     /^\+\+\+ / { f = substr($0, 7); next }
     /^@@ / { split($3, a, ","); ln = substr(a[1], 2) + 0; next }
     /^\+/ { print f ":" ln "\t" substr($0, 2); ln++ }') || { echo "!! 검사 도구 오류(awk)"; return 1; }
+  [ -z "$added" ] && return $bad
   for spec in \
     'PRIVATE KEY|-----BEGIN [A-Z ]*PRIVATE KEY' \
-    "키/토큰/비밀번호|(app_?key|secret_?key|appsecret|access_?token|refresh_?token|password|admin_?pin)[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9+/_-]{12,}" \
+    "키/토큰 리터럴|${KEYS}[[:alnum:]_]*[\"']?[[:space:]]*[:=][[:space:]]*[\"'][A-Za-z0-9+/_.=-]{16,}[\"']" \
+    "env 값|^[^	]*\.env[^	]*	.*${KEYS}[[:alnum:]_]*[[:space:]]*=[[:space:]]*[^[:space:]\$\"'{}]{12,}" \
     '계좌번호 형식|(^|[^0-9])[0-9]{8}-[0-9]{2}([^0-9]|$)|(^|[^0-9])[0-9]{4}-[0-9]{4}-[0-9]{2}([^0-9]|$)'; do
     kind=${spec%%|*}; re=${spec#*|}
     rc=0; out=$(printf '%s\n' "$added" | grep -iE -- "$re") || rc=$?
-    [ $rc -gt 1 ] && { echo "!! 검사 도구 오류(grep)"; return 1; }
+    [ $rc -gt 1 ] && { echo "!! 검사 도구 오류(grep: ${kind})"; return 1; }
     [ -z "$out" ] && continue
     while IFS= read -r line; do
-      f=${line%%:*}
-      if [ "$kind" != "PRIVATE KEY" ] && case ",${SCAN_ALLOW:-}," in *",${f},"*) true;; *) false;; esac; then continue; fi
-      hits="${hits}   ${line%%	*}  [${kind}]
+      loc=${line%%	*}; body=${line#*	}; f=${loc%:*}
+      if [ "$kind" != "PRIVATE KEY" ]; then
+        case ",${SCAN_ALLOW:-}," in *",${f},"*) continue;; esac
+        # 테스트·예시 값 판정은 줄 내용만 본다 (경로의 tests/·.example 은 판정에 쓰지 않음)
+        rc=0; printf '%s\n' "$body" | grep -qiE -- "$DUMMY" || rc=$?
+        [ $rc -gt 1 ] && { echo "!! 검사 도구 오류(grep dummy)"; return 1; }
+        [ $rc -eq 0 ] && continue
+      fi
+      hits="${hits}   ${loc}  [${kind}]  $(printf '%s' "$body" | mask)
 "
     done <<EOF
 $out
 EOF
   done
   if [ -n "$hits" ]; then
-    echo "$hits" | head -40
-    echo "!! 키·토큰·계좌번호로 보이는 값 — 위 위치를 직접 확인 필요 (값은 출력하지 않음)"; bad=1
+    printf '%s' "$hits" | head -60
+    echo "!! 키·토큰·계좌번호로 보이는 값 — 위 위치를 직접 확인 필요 (값은 «값»으로 가림)"; bad=1
   fi
   return $bad
 }
@@ -119,7 +142,9 @@ for u in "${UNITS[@]}"; do
   fi
 done
 
-echo; echo "== 단위에 속하지 않은 남은 변경 (직접 확인)"; git status --short | head -30
+EXCL=()
+for u in "${UNITS[@]}"; do IFS='|' read -r _n _m paths <<<"$u"; for p in $paths; do EXCL+=(":(exclude)$p"); done; done
+echo; echo "== 어느 단위에도 속하지 않은 변경 (직접 확인)"; git status --short -- . "${EXCL[@]}" | head -40
 
 if [ $APPLY -eq 1 ]; then
   git push -u origin "$BRANCH"
